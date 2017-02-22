@@ -1,0 +1,5 @@
+usr/include/*
+usr/lib/*/libfty_info.so
+usr/lib/*/pkgconfig/libfty_info.pc
+usr/share/man/man3/*
+usr/share/man/man7/*
