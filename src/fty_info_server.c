@@ -25,42 +25,88 @@
 @discuss
 @end
 */
+#define TIMEOUT_MS 30000   //wait at least 30 seconds
 
 #include "fty_info_classes.h"
-
-//  Structure of our class
-
-struct _fty_info_server_t {
-    int filler;     //  Declare class properties here
-};
-
 
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
-fty_info_server_t *
-fty_info_server_new (void)
-{
-    fty_info_server_t *self = (fty_info_server_t *) zmalloc (sizeof (fty_info_server_t));
-    assert (self);
-    //  Initialize class properties here
-    return self;
-}
-
-
-//  --------------------------------------------------------------------------
-//  Destroy the fty_info_server
-
 void
-fty_info_server_destroy (fty_info_server_t **self_p)
+fty_info_server (zsock_t *pipe, void *args)
 {
-    assert (self_p);
-    if (*self_p) {
-        fty_info_server_t *self = *self_p;
-        //  Free class properties here
-        //  Free object itself
-        free (self);
-        *self_p = NULL;
+    bool verbose = false;
+    mlm_client_t *client = mlm_client_new ();
+    zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (client), NULL);
+    assert (poller);
+
+    zsock_signal (pipe, 0); 
+    zsys_info ("fty-info: Started");
+
+    while (!zsys_interrupted)
+    {
+         void *which = zpoller_wait (poller, TIMEOUT_MS);
+         if (which == NULL) {
+             if (zpoller_terminated (poller) || zsys_interrupted) {
+                 zsys_info ("Terminating.");
+                 break;
+             }
+         }
+         if (which == pipe) {
+             if (verbose)
+                 zsys_debug ("which == pipe");
+             zmsg_t *message = zmsg_recv (pipe);
+             if (!message)
+                 break;
+             
+             char *command = zmsg_popstr (message);
+             if (!command) {
+                 zmsg_destroy (&message);
+                 zsys_warning ("Empty command.");
+                 continue;
+             }
+             if (streq(command, "$TERM")) {
+                 zsys_info ("Got $TERM");
+                 zmsg_destroy (&message);
+                 zstr_free (&command);
+                 break;
+             }
+             else
+                 if (streq(command, "CONNECT"))
+                 {
+                     char *endpoint = zmsg_popstr (message);
+                     char *name = zmsg_popstr (message);
+
+                     if (endpoint && name) {
+                         if (verbose)
+                             zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, name);
+                         int rv = mlm_client_connect (client, endpoint, 1000, name);
+                         if (rv == -1)
+                             zsys_error("mlm_client_connect failed\n");
+                     }
+                     zstr_free (&endpoint);
+                     zstr_free (&name);
+                 }
+                 else
+                     if (streq (command, "VERBOSE"))
+                     {
+                         verbose = true;
+                         zsys_debug ("fty-info: VERBOSE=true");
+                     }
+                     else {
+                         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
+                     }
+             zstr_free (&command);
+             zmsg_destroy (&message);
+         }
+         else
+             if (which == mlm_client_msgpipe (client)) {
+                 //TODO: implement actor interface
+                 zmsg_t *message = mlm_client_recv (client);
+                 if (!message)
+                    break;
+                 zmsg_destroy (&message);
+             }
     }
 }
 
@@ -73,10 +119,6 @@ fty_info_server_test (bool verbose)
     printf (" * fty_info_server: ");
 
     //  @selftest
-    //  Simple create/destroy test
-    fty_info_server_t *self = fty_info_server_new ();
-    assert (self);
-    fty_info_server_destroy (&self);
     //  @end
     printf ("OK\n");
 }

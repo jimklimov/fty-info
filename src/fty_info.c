@@ -49,8 +49,31 @@ int main (int argc, char *argv [])
             return 1;
         }
     }
+    if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
+                verbose = true;
+        
+    zactor_t *server = zactor_new (fty_info_server, "outage");    
+
     //  Insert main code here
-    if (verbose)
+    if (verbose) {
+        zstr_sendx (server, "VERBOSE", NULL);  
         zsys_info ("fty_info - Agent which returns rack controller information");
+    }
+    
+    zstr_sendx (server, "CONNECT", "ipc://@/malamute", "fty-info", NULL);
+
+    // src/malamute.c, under MPL license
+    while (true) {
+        char *str = zstr_recv (server);
+        if (str) {
+            puts (str);
+            zstr_free (&str);
+        }
+        else {
+            puts ("Interrupted ...");
+            break;
+        }
+    }
+    zactor_destroy (&server);
     return 0;
 }
