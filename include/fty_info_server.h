@@ -27,13 +27,9 @@ extern "C" {
 #endif
 
 //  @interface
-//  Create a new fty_info_server
-FTY_INFO_EXPORT fty_info_server_t *
-    fty_info_server_new (void);
-
-//  Destroy the fty_info_server
+//  fty_info_server actor
 FTY_INFO_EXPORT void
-    fty_info_server_destroy (fty_info_server_t **self_p);
+    fty_info_server (zsock_t *pipe, void *args);
 
 //  Self test of this class
 FTY_INFO_EXPORT void
