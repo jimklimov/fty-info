@@ -29,6 +29,33 @@
 
 #include "fty_info_classes.h"
 
+static char*
+s_readall (const char* filename) {
+    FILE *fp = fopen(filename, "rt");
+    if (!fp)
+        return NULL;
+
+    size_t fsize = 0; 
+    fseek(fp, 0, SEEK_END);
+    fsize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *ret = (char*) malloc (fsize * sizeof (char) + 1);
+    if (!ret) {
+        fclose (fp);
+        return NULL;
+    }    
+    memset ((void*) ret, '\0', fsize * sizeof (char) + 1);
+
+    size_t r = fread((void*) ret, 1, fsize, fp); 
+    fclose (fp);
+    if (r == fsize)
+        return ret; 
+
+    free (ret);
+    return NULL;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
@@ -45,6 +72,7 @@ fty_info_server (zsock_t *pipe, void *args)
 
     while (!zsys_interrupted)
     {
+        zsys_debug ("Waiting for poller");
          void *which = zpoller_wait (poller, TIMEOUT_MS);
          if (which == NULL) {
              if (zpoller_terminated (poller) || zsys_interrupted) {
@@ -52,6 +80,7 @@ fty_info_server (zsock_t *pipe, void *args)
                  break;
              }
          }
+        zsys_debug ("Not Waiting for poller");
          if (which == pipe) {
              if (verbose)
                  zsys_debug ("which == pipe");
@@ -105,6 +134,31 @@ fty_info_server (zsock_t *pipe, void *args)
                  zmsg_t *message = mlm_client_recv (client);
                  if (!message)
                     break;
+
+                 char *command = zmsg_popstr (message);
+                 if (!command) {
+                     zmsg_destroy (&message);
+                     zsys_warning ("Empty command.");
+                     continue;
+                 }
+                 if (streq(command, "VERSION")) {
+                    zmsg_t *reply = zmsg_new ();
+                    char *version = s_readall ("/etc/bios-release.json");
+                    if (version == NULL) {
+                        zmsg_addstrf (reply, "%s", "ERROR");
+                        zmsg_addstrf (reply, "%s", "Version info could not be found");
+                        mlm_client_sendto (client, mlm_client_sender (client), "fty-info", NULL, 1000, &reply);
+                    }
+                    else {
+                        zmsg_addstrf (reply, "%s", "VERSION");
+                        zmsg_addstrf (reply, "%s", version);
+                        mlm_client_sendto (client, mlm_client_sender (client), "fty-info", NULL, 1000, &reply);
+                    }
+                 }
+                 else {
+                     zsys_error ("fty-info: Unknown actor command: %s.\n", command);
+                 }
+                 zstr_free (&command);
                  zmsg_destroy (&message);
              }
     }
@@ -119,6 +173,42 @@ fty_info_server_test (bool verbose)
     printf (" * fty_info_server: ");
 
     //  @selftest
+
+   static const char* endpoint = "inproc://fty-info-test";
+
+   zactor_t *server = zactor_new (mlm_server, (void*) "Malamute");
+   zstr_sendx (server, "BIND", endpoint, NULL);
+   if (verbose)
+       zstr_send (server, "VERBOSE");
+
+   mlm_client_t *ui = mlm_client_new ();
+   mlm_client_connect (ui, endpoint, 1000, "UI");
+
+   zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info-test");
+   //if (verbose)
+   //    zstr_send (info_server, "VERBOSE");
+   zstr_sendx (info_server, "CONNECT", endpoint, NULL);
+   zclock_sleep (1000);
+
+    // Test #1: command VERSION
+    {
+        zmsg_t *command = zmsg_new ();
+        zmsg_addstrf (command, "%s", "VERSION");
+        mlm_client_sendto (ui, "fty-info-test", "fty-info", NULL, 1000, &command);
+
+        zmsg_t *recv = mlm_client_recv (ui);
+
+        assert (zmsg_size (recv) == 2);
+        char * foo = zmsg_popstr (recv);
+        if (streq (foo, "VERSION")) {
+            zstr_free (&foo);
+            foo = zmsg_popstr (recv);
+            zsys_debug ("Received version: \n%s", foo);
+        }
+        zstr_free (&foo);
+        zmsg_destroy (&recv);
+    }
+
     //  @end
     printf ("OK\n");
 }
