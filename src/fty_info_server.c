@@ -142,7 +142,11 @@ fty_info_server (zsock_t *pipe, void *args)
                  }
                  if (streq(command, "VERSION")) {
                     zmsg_t *reply = zmsg_new ();
+                    // are we on RC?
                     char *version = s_readall ("/etc/bios-release.json");
+                    if (version == NULL)
+                        // maybe we are on the container
+                        version = s_readall ("/usr/share/bios-web/image-version.txt");
                     if (version == NULL) {
                         zmsg_addstrf (reply, "%s", "ERROR");
                         zmsg_addstrf (reply, "%s", "Version info could not be found");
