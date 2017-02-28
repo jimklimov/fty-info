@@ -52,7 +52,7 @@ int main (int argc, char *argv [])
     if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
                 verbose = true;
         
-    zactor_t *server = zactor_new (fty_info_server, "outage");    
+    zactor_t *server = zactor_new (fty_info_server, (void*) "fty-info");    
 
     //  Insert main code here
     if (verbose) {

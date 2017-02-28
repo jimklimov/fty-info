@@ -27,7 +27,50 @@
 */
 #define TIMEOUT_MS 30000   //wait at least 30 seconds
 
+#include <string>
+
 #include "fty_info_classes.h"
+
+struct _fty_info_t {
+	std::string uuid;
+	std::string hostname;
+	std::string name;
+	std::string product_name;
+	std::string location;
+	std::string version;
+	std::string rest_root;
+	int rest_port;
+};
+
+fty_info_t*
+fty_info_new (void)
+{
+	fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
+	// set uuid - will be a name column from DB
+	// set hostname - FQDN, or just hostname?
+	// set name - will be displayName from DB
+	// set product name - "hardware-catalog-number" from /etc/release-details.json (first part?)
+	// set location - DB?
+	// set version - how do we define that?
+	// set rest_root
+	// set rest_port
+	return self;
+}
+
+void
+fty_info_destroy (fty_info_t ** self_ptr)
+{
+	if (!self_ptr)
+		return;
+	if (*self_ptr) {
+		fty_info_t *self = *self_ptr;
+		// Free class properties here
+		// Free object itself
+		free (self);
+		*self_ptr = NULL;
+	}
+
+}
 
 static char*
 s_readall (const char* filename) {

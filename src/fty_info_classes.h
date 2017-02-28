@@ -35,6 +35,10 @@
 //  Extra headers
 
 //  Opaque class structures to allow forward references
+#ifndef FTY_INFO_T_DEFINED
+typedef struct _fty_info_t fty_info_t;
+#define FTY_INFO_T_DEFINED
+#endif
 
 //  Internal API
 
