@@ -65,11 +65,11 @@ GENERATED_DOCS =
 	@true
 
 GENERATED_DOCS += fty_info_server.txt fty_info_server.doc
-fty_info_server.txt: $(top_srcdir)/src/fty_info_server.c
+fty_info_server.txt: $(top_srcdir)/src/fty_info_server.cc
 	"$(srcdir)/mkman" "fty_info_server" "$(builddir)/fty_info_server.txt" "$(srcdir)/.."
 
 GENERATED_DOCS += fty-info.txt fty-info.doc
-fty-info.txt: $(top_srcdir)/src/fty_info.c
+fty-info.txt: $(top_srcdir)/src/fty_info.cc
 	"$(srcdir)/mkman" "fty_info" "$(builddir)/fty-info.txt" "$(srcdir)/.."
 
 
