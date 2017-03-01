@@ -32,6 +32,8 @@
 //  External dependencies
 #include <czmq.h>
 #include <malamute.h>
+#include <cxxtools/allocator.h>
+#include <tntdb.h>
 #include <ftyproto.h>
 
 //  FTY_INFO version macros for compile-time API detection
