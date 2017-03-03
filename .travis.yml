@@ -32,13 +32,15 @@ matrix:
   - env: BUILD_TYPE=valgrind
     os: linux
     dist: trusty
+    sudo: required
     addons:
       apt:
-        sources:
-        - sourceline: 'deb http://download.opensuse.org/repositories/home:/zeromq:/git-draft/xUbuntu_14.04/ ./'
-          key_url: 'http://download.opensuse.org/repositories/home:/zeromq:/git-draft/xUbuntu_14.04/Release.key'
         packages:
         - valgrind
+        - git
+        - asciidoc
+        - xmlto
+
 #       - libzmq3-dev
 #       - libczmq-dev
 #       - libmlm-dev
