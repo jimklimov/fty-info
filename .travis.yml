@@ -3,7 +3,7 @@
 # You can add hand-written code here.
 # ATTENTION: this file was edited by hand.
 
-language: cpp
+language: c
 
 cache: ccache
 
@@ -11,6 +11,9 @@ os:
 - linux
 
 sudo: false
+
+services:
+- docker
 
 # Set CI_TIME=true to enable build-step profiling in Travis
 # Set CI_TRACE=true to enable shell script tracing in Travis
