@@ -54,8 +54,8 @@ struct _fty_info_t {
 std::vector<std::string> rest_roots { "/api/v1/" };
 std::vector<int> rest_ports { 8000, 80, 443 };
 
-int
-get_product_name
+static int
+s_get_product_name
 	(std::istream &f,
 	 std::string &product_name)
 {
@@ -76,8 +76,8 @@ get_product_name
 	}
 }
 
-int
-select_rack_controller_parent
+static int
+s_select_rack_controller_parent
 	(tntdb::Connection &conn,
 	 char *name,
 	 std::string &parent_name)
@@ -110,8 +110,8 @@ select_rack_controller_parent
 }
 
 //TODO: change after we add display name
-int
-select_rack_controller_name
+static int
+s_select_rack_controller_name
 	(tntdb::Connection &conn,
 	 std::string &name)
 {
@@ -186,7 +186,7 @@ fty_info_new (void)
 	
 	//set name
 	std::string name;
-	rv = select_rack_controller_name (conn, name);
+	rv = s_select_rack_controller_name (conn, name);
 	if (rv < 0) {
 		zsys_warning ("fty_info could not be fully initialized (error while getting the name)");
 		self->name = strdup ("");
@@ -200,7 +200,7 @@ fty_info_new (void)
 	// set product name - "hardware-catalog-number" from /etc/release-details.json (first part?)
 	std::ifstream f(RELEASE_DETAILS);
 	std::string product_name;
-	rv = get_product_name (f, product_name);
+	rv = s_get_product_name (f, product_name);
 	if (rv < 0) {
 		zsys_warning ("fty_info could not be fully initialized (error while getting the product name)");
 		self->product_name = strdup ("");
@@ -213,7 +213,7 @@ fty_info_new (void)
 	
 	// set location (parent)
 	std::string parent;
-	rv = select_rack_controller_parent (conn, self->name, parent);
+	rv = s_select_rack_controller_parent (conn, self->name, parent);
 	if (rv < 0) {
 		zsys_warning ("fty_info could not be fully initialized (error while getting the location)");
 		self->location = strdup ("");
@@ -226,11 +226,13 @@ fty_info_new (void)
 	
 	// TODO: set version
 	self->version = strdup ("");
-	// set rest_root - what if we can find more than one?
+	// TODO: set rest_root - what if we can find more than one?
 	self->rest_root = strdup ("");
-	// set rest_port - what if we can find more than one?
+	// TODO: set rest_port - what if we can find more than one?
 	self->rest_port = 0;
 
+	conn.clearStatementCache ();
+	conn.close ();
 	return self;
 }
 
@@ -254,33 +256,6 @@ fty_info_destroy (fty_info_t ** self_ptr)
 		*self_ptr = NULL;
 	}
 
-}
-
-static char*
-s_readall (const char* filename) {
-    FILE *fp = fopen(filename, "rt");
-    if (!fp)
-        return NULL;
-
-    size_t fsize = 0; 
-    fseek(fp, 0, SEEK_END);
-    fsize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    char *ret = (char*) malloc (fsize * sizeof (char) + 1);
-    if (!ret) {
-        fclose (fp);
-        return NULL;
-    }    
-    memset ((void*) ret, '\0', fsize * sizeof (char) + 1);
-
-    size_t r = fread((void*) ret, 1, fsize, fp); 
-    fclose (fp);
-    if (r == fsize)
-        return ret; 
-
-    free (ret);
-    return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -367,20 +342,20 @@ fty_info_server (zsock_t *pipe, void *args)
                      zsys_warning ("Empty command.");
                      continue;
                  }
-                 if (streq(command, "VERSION")) {
+                 if (streq(command, "INFO")) {
                     zmsg_t *reply = zmsg_new ();
-                    char *version = s_readall ("/etc/release-details.json");
-                    if (version == NULL) {
-                        zmsg_addstrf (reply, "%s", "ERROR");
-                        zmsg_addstrf (reply, "%s", "Version info could not be found");
-                        mlm_client_sendto (client, mlm_client_sender (client), "fty-info", NULL, 1000, &reply);
-                    }
-                    else {
-                        zmsg_addstrf (reply, "%s", "VERSION");
-                        zmsg_addstrf (reply, "%s", version);
-                        mlm_client_sendto (client, mlm_client_sender (client), "fty-info", NULL, 1000, &reply);
-                    }
-                 }
+					fty_info_t *self = fty_info_new ();
+					zmsg_addstrf (reply, "%s", self->uuid);
+					zmsg_addstrf (reply, "%s", self->hostname);
+					zmsg_addstrf (reply, "%s", self->name);
+					zmsg_addstrf (reply, "%s", self->product_name);
+					zmsg_addstrf (reply, "%s", self->location);
+					zmsg_addstrf (reply, "%s", self->version);
+					zmsg_addstrf (reply, "%s", self->rest_root);
+					zmsg_addstrf (reply, "%d", self->rest_port);
+                    mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                 	fty_info_destroy (&self);
+				 }
                  else {
                      zsys_error ("fty-info: Unknown actor command: %s.\n", command);
                  }
@@ -418,35 +393,6 @@ fty_info_server_test (bool verbose)
    zstr_sendx (info_server, "CONNECT", endpoint, NULL);
    zclock_sleep (1000);
 
-    // Test #1: command VERSION
-    {
-        zmsg_t *command = zmsg_new ();
-        zmsg_addstrf (command, "%s", "VERSION");
-        mlm_client_sendto (ui, "fty-info-test", "fty-info", NULL, 1000, &command);
-
-        zmsg_t *recv = mlm_client_recv (ui);
-
-        assert (zmsg_size (recv) == 2);
-        char * foo = zmsg_popstr (recv);
-        if (streq (foo, "VERSION")) {
-            zstr_free (&foo);
-            foo = zmsg_popstr (recv);
-            zsys_debug ("Received version: \n%s", foo);
-        }
-        else if (streq (foo, "ERROR")) {
-            zstr_free (&foo);
-            foo = zmsg_popstr (recv);
-            zsys_debug ("Received error: \n%s", foo);
-        }
-        else {
-            zsys_warning ("Unexpected message: commmand = '%s', sender = '%s', subject = '%s'",
-                    mlm_client_command (ui),
-                    mlm_client_sender (ui),
-                    mlm_client_subject (ui));
-        }
-        zstr_free (&foo);
-        zmsg_destroy (&recv);
-    }
 	// Test #2: create/destroy test for fty_info_t
 	{
 		fty_info_t *self = fty_info_new ();
@@ -455,6 +401,42 @@ fty_info_server_test (bool verbose)
 			fty_info_destroy (&self);
 		}
 	}
+    // Test #2: command INFO
+    {
+        zmsg_t *command = zmsg_new ();
+        zmsg_addstrf (command, "%s", "INFO");
+        mlm_client_sendto (ui, "fty-info-test", "info", NULL, 1000, &command);
+
+        zmsg_t *recv = mlm_client_recv (ui);
+
+        assert (zmsg_size (recv) == 8);
+        char * uuid = zmsg_popstr (recv);
+        zsys_debug ("fty-info: uuid = '%s'", uuid);
+		char * hostname = zmsg_popstr (recv);
+        zsys_debug ("fty-info: hostname = '%s'", hostname);
+        char * name = zmsg_popstr (recv);
+        zsys_debug ("fty-info: name = '%s'", name);
+        char * product_name = zmsg_popstr (recv);
+        zsys_debug ("fty-info: product_name = '%s'", product_name);
+        char * location = zmsg_popstr (recv);
+        zsys_debug ("fty-info: location = '%s'", location);
+        char * version = zmsg_popstr (recv);
+        zsys_debug ("fty-info: version = '%s'", version);
+        char * rest_root = zmsg_popstr (recv);
+        zsys_debug ("fty-info: rest_root = '%s'", rest_root);
+        char * rest_port = zmsg_popstr (recv);
+        zsys_debug ("fty-info: rest_port = '%s'", rest_port);
+
+		zstr_free (&uuid);
+		zstr_free (&hostname);
+		zstr_free (&name);
+		zstr_free (&product_name);
+		zstr_free (&location);
+		zstr_free (&version);
+		zstr_free (&rest_root);
+		zstr_free (&rest_port);
+        zmsg_destroy (&recv);
+    }
 
     //  @end
     printf ("OK\n");
