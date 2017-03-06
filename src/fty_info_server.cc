@@ -331,7 +331,22 @@ fty_info_server (zsock_t *pipe, void *args)
                  }
                  if (streq(command, "INFO")) {
                     zmsg_t *reply = zmsg_new ();
-					fty_info_t *self = fty_info_new ();
+					fty_info_t *self;
+					if (streq (mlm_client_subject (client), "info"))
+						self = fty_info_new ();
+					else if (streq (mlm_client_subject (client), "info-test")) {
+						self = (fty_info_t *) malloc (sizeof (fty_info_t));
+						self->uuid = strdup ("");
+						self->hostname = strdup ("jana");
+						self->name = strdup ("RC1");
+						self->product_name = strdup ("IPC3000E-alpha1");
+						self->location = strdup ("Rack1");
+						self->version = strdup ("");
+						self->rest_root = strdup (rest_roots.at (0).c_str ());
+						self->rest_port = rest_ports.at (0);
+					}
+					else
+						zsys_warning ("fty-info: Received INFO command with unexpected subject '%s'", mlm_client_subject (client));
 					zmsg_addstrf (reply, "%s", self->uuid);
 					zmsg_addstrf (reply, "%s", self->hostname);
 					zmsg_addstrf (reply, "%s", self->name);
@@ -380,19 +395,11 @@ fty_info_server_test (bool verbose)
    zstr_sendx (info_server, "CONNECT", endpoint, NULL);
    zclock_sleep (1000);
 
-	// Test #1: create/destroy test for fty_info_t
-	{
-		fty_info_t *self = fty_info_new ();
-		if (self) {
-			zsys_debug ("fty_info object created successfully");
-			fty_info_destroy (&self);
-		}
-	}
-    // Test #2: command INFO
+    // Test #1: command INFO
     {
         zmsg_t *command = zmsg_new ();
         zmsg_addstrf (command, "%s", "INFO");
-        mlm_client_sendto (ui, "fty-info-test", "info", NULL, 1000, &command);
+        mlm_client_sendto (ui, "fty-info-test", "info-test", NULL, 1000, &command);
 
         zmsg_t *recv = mlm_client_recv (ui);
 
