@@ -11,6 +11,7 @@ PartOf=bios.target
 [Service]
 Type=simple
 Environment="prefix=@prefix@"
+EnvironmentFile=-/etc/default/bios-db-ro
 ExecStart=@prefix@/bin/fty-info @sysconfdir@/@PACKAGE@/fty-info.cfg
 
 [Install]
