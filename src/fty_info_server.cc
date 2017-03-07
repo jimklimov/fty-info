@@ -257,6 +257,7 @@ fty_info_server (zsock_t *pipe, void *args)
         return;
     }
     bool verbose = false;
+
     mlm_client_t *client = mlm_client_new ();
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (client), NULL);
     assert (poller);
@@ -331,9 +332,11 @@ fty_info_server (zsock_t *pipe, void *args)
                  }
                  if (streq(command, "INFO")) {
                     zmsg_t *reply = zmsg_new ();
+                    char *zuuid = zmsg_popstr (message);
                     fty_info_t *self;
-                    if (streq (mlm_client_subject (client), "info"))
+                    if (streq (mlm_client_subject (client), "info")) {
                         self = fty_info_new ();
+                    }
                     else if (streq (mlm_client_subject (client), "info-test")) {
                         self = (fty_info_t *) malloc (sizeof (fty_info_t));
                         self->uuid = strdup ("");
@@ -347,6 +350,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     }
                     else
                         zsys_warning ("fty-info: Received INFO command with unexpected subject '%s'", mlm_client_subject (client));
+                    zmsg_addstrf (reply, "%s", zuuid);
                     zmsg_addstrf (reply, "%s", self->uuid);
                     zmsg_addstrf (reply, "%s", self->hostname);
                     zmsg_addstrf (reply, "%s", self->name);
@@ -356,6 +360,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     zmsg_addstrf (reply, "%s", self->rest_root);
                     zmsg_addstrf (reply, "%d", self->rest_port);
                     mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                    zstr_free (&zuuid);
                     fty_info_destroy (&self);
                  }
                  else {
@@ -388,6 +393,7 @@ fty_info_server_test (bool verbose)
 
    mlm_client_t *ui = mlm_client_new ();
    mlm_client_connect (ui, endpoint, 1000, "UI");
+   zuuid_t *zuuid = zuuid_new ();
    
    zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info-test");
    if (verbose)
@@ -399,11 +405,14 @@ fty_info_server_test (bool verbose)
     {
     zmsg_t *command = zmsg_new ();
     zmsg_addstrf (command, "%s", "INFO");
+    zmsg_addstrf (command, "%s", zuuid_str_canonical (zuuid));
     mlm_client_sendto (ui, "fty-info-test", "info-test", NULL, 1000, &command);
 
     zmsg_t *recv = mlm_client_recv (ui);
 
-    assert (zmsg_size (recv) == 8);
+    assert (zmsg_size (recv) == 9);
+    char *zuuid_reply = zmsg_popstr (recv);
+    assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
     char * uuid = zmsg_popstr (recv);
     zsys_debug ("fty-info: uuid = '%s'", uuid);
     char * hostname = zmsg_popstr (recv);
@@ -421,6 +430,7 @@ fty_info_server_test (bool verbose)
     char * rest_port = zmsg_popstr (recv);
     zsys_debug ("fty-info: rest_port = '%s'", rest_port);
 
+    zstr_free (&zuuid_reply);
     zstr_free (&uuid);
     zstr_free (&hostname);
     zstr_free (&name);
@@ -430,6 +440,8 @@ fty_info_server_test (bool verbose)
     zstr_free (&rest_root);
     zstr_free (&rest_port);
     zmsg_destroy (&recv);
+    printf ("zuuid = '%s'\n", zuuid_str_canonical (zuuid));
+    zuuid_destroy (&zuuid);
     }
 
     //  @end
