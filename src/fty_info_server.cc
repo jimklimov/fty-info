@@ -28,7 +28,14 @@
 #define TIMEOUT_MS 30000   //wait at least 30 seconds
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
-#define FTY_INFO_TEST "info-test" 
+//test value for INFO-TEST command reply
+#define TST_UUID "ce7c523e-08bf-11e7-af17-080027d52c4f"
+#define TST_HOSTNAME "localhost"
+#define TST_NAME "ipc-001"
+#define TST_PRODUCT_NAME "IPC3000"
+#define TST_LOCATION "Rack1"
+#define TST_VERSION "1.0.0"
+
 
 #include <string>
 #include <unistd.h>
@@ -53,13 +60,6 @@ struct _fty_info_t {
     char *rest_root;
     char *rest_port;
 };
-
-const char *TST_UUID="ce7c523e-08bf-11e7-af17-080027d52c4f";
-const char *TST_HOSTNAME="localhost";
-const char *TST_NAME="ipc-001";
-const char *TST_PRODUCT_NAME="IPC3000";
-const char *TST_LOCATION="Rack1";
-const char *TST_VERSION="1.0.0";
 
 std::vector<std::string> rest_roots { "/api/v1/" };
 std::vector<std::string> rest_ports { "8000", "80", "443" };
