@@ -26,5 +26,16 @@
 #include "fty_info_library.h"
 
 //  Add your own public definitions here, if you need them
+#define FTY_INFO_AGENT "fty-info"
+#define FTY_INFO_CMD "INFO"
+
+#define INFO_UUID  "uuid"
+#define INFO_HOSTNAME  "hostname"
+#define INFO_NAME  "name"
+#define INFO_PRODUCT_NAME "product_name"
+#define INFO_LOCATION  "location"
+#define INFO_VERSION  "version"
+#define INFO_REST_ROOT  "rest_root"
+#define INFO_REST_PORT  "rest_port"
 
 #endif

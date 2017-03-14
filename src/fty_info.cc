@@ -48,7 +48,7 @@ int main (int argc, char *argv [])
     if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
                 verbose = true;
         
-    zactor_t *server = zactor_new (fty_info_server, (void*) "fty-info");    
+    zactor_t *server = zactor_new (fty_info_server, (void*) FTY_INFO_AGENT);    
 
     //  Insert main code here
     if (verbose) {
@@ -56,7 +56,7 @@ int main (int argc, char *argv [])
         zsys_info ("fty_info - Agent which returns rack controller information");
     }
     
-    zstr_sendx (server, "CONNECT", "ipc://@/malamute", "fty-info", NULL);
+    zstr_sendx (server, "CONNECT", "ipc://@/malamute", FTY_INFO_AGENT, NULL);
 
     // src/malamute.c, under MPL license
     while (true) {

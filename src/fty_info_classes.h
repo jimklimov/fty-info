@@ -32,6 +32,7 @@
 //  External API
 #include "../include/fty_info.h"
 
+
 //  Extra headers
 
 //  Opaque class structures to allow forward references
