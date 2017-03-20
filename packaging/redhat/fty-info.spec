@@ -115,6 +115,7 @@ find %{buildroot} -name '*.la' | xargs rm -f
 
 %files
 %defattr(-,root,root)
+%doc README.md
 %{_bindir}/fty-info
 %{_mandir}/man1/fty-info*
 %config(noreplace) %{_sysconfdir}/fty-info/fty-info.cfg
