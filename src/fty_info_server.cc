@@ -29,12 +29,16 @@
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 //test value for INFO-TEST command reply
-#define TST_UUID "ce7c523e-08bf-11e7-af17-080027d52c4f"
+#define TST_UUID     "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME "localhost"
-#define TST_NAME "ipc-001"
-#define TST_PRODUCT_NAME "IPC3000"
+#define TST_NAME     "ipc-001"
+#define TST_MODEL    "IPC3000"
+#define TST_VENDOR   "Eaton"
+#define TST_SERIAL   "LA71026006"
 #define TST_LOCATION "Rack1"
-#define TST_VERSION "1.0.0"
+#define TST_VERSION  "1.0.0"
+#define TST_PATH     "/api/v1"
+#define TST_PORT     "80"
 
 
 #include <string>
@@ -49,49 +53,70 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 #include "fty_info_classes.h"
 
+static std::string url =
+    std::string("mysql:db=box_utf8;user=") +
+    ((getenv("DB_USER")   == NULL) ? "root" : getenv("DB_USER")) +
+    ((getenv("DB_PASSWD") == NULL) ? ""     :
+    std::string(";password=") + getenv("DB_PASSWD"));
+
 struct _fty_info_t {
     zhash_t *infos;
     char *uuid;
     char *hostname;
     char *name;
-    char *product_name;
+    char *model;
+    char *vendor;
+    char *serial;
     char *location;
     char *version;
-    char *rest_root;
+    char *rest_path;
     char *rest_port;
 };
 
-std::vector<std::string> rest_roots { "/api/v1/" };
-std::vector<std::string> rest_ports { "8000", "80", "443" };
 
-static int
-s_get_product_name
-    (std::istream &f,
-     std::string &product_name)
+static cxxtools::SerializationInfo*
+s_load_release_details()
 {
+    cxxtools::SerializationInfo *si = new cxxtools::SerializationInfo();
     try {
-        cxxtools::SerializationInfo si;
+        std::ifstream f(RELEASE_DETAILS);
         std::string json_string (std::istreambuf_iterator<char>(f), {});
         std::stringstream s(json_string);
         cxxtools::JsonDeserializer json(s);
-        json.deserialize (si);
-        //if (si.memberCount == 0)
-        //throw std::runtime_error ("Document /etc/release-details.json is empty");
-        si.getMember("release-details").getMember("hardware-catalog-number") >>= product_name;
-        return 0;
+        json.deserialize (*si);
+        zsys_info("fty-info:load %s OK",RELEASE_DETAILS);
     }
     catch (const std::exception& e) {
         zsys_error ("Error while parsing JSON: %s", e.what ());
-        return -1;
     }
+    return si;
 }
 
-static int
+
+static char*
+s_get_release_details
+    (cxxtools::SerializationInfo *si,
+     const char *key,
+     const char * dfl)
+{
+    std::string value = dfl;
+    try {
+        si->getMember("release-details").getMember(key) >>= value;
+    }
+    catch (const std::exception& e) {
+        zsys_error ("Error while getting %s in JSON: %s", key, e.what ());
+    }
+    return strdup(value.c_str());
+}
+
+static char*
 s_select_rack_controller_parent
     (tntdb::Connection &conn,
      char *name,
-     std::string &parent_name)
+     const char * dfl)
 {
+    std::string parent_name = dfl;
+    if (!conn)return strdup(dfl);
     try {
         tntdb::Statement st = conn.prepareCached(
         " SELECT "
@@ -103,27 +128,28 @@ s_select_rack_controller_parent
         );
         tntdb::Result result = st.set ("name", name).select ();
         if (result.size () > 1) {
-            zsys_error ("asset '%s' has more than one parent, DB is messed up");
-            return -2;
+            zsys_warning ("asset '%s' has more than one parent, DB is messed up",name);
         }
         for (auto &row: result) {
             row ["parent_name"].get (parent_name);
-            zsys_debug ("Found parent '%s'", parent_name.c_str ());
         }
-        return 0;
     }
     catch (const std::exception& e) {
         zsys_error ("Error: %s", e.what ());
-        return -1;
     }
+    return strdup(parent_name.c_str());
+    
 }
 
 //TODO: change after we add display name
-static int
+
+static char*
 s_select_rack_controller_name
     (tntdb::Connection &conn,
-     std::string &name)
+     const char * dfl)
 {
+    std::string name;
+    if (!conn)return strdup(dfl);
     try {
         tntdb::Statement st = conn.prepareCached(
         " SELECT "
@@ -135,34 +161,32 @@ s_select_rack_controller_name
         );
         tntdb::Result result = st.select ();
         if (result.size () > 1) {
-            zsys_error ("fty-info found more than one RC, not sure what to do");
-            return -2;
+            zsys_warning ("fty-info found more than one RC, not sure what to do");
         }
-
         for (auto &row: result) {
             row ["name"].get (name);
-            zsys_debug ("Found RC '%s'", name.c_str ());
         }
-        return 0;
     }
     catch (const std::exception& e) {
         zsys_error ("Error: %s", e.what ());
-        return -1;
     }
+    return strdup(name.c_str());
 }
 fty_info_t*
 fty_info_test_new (void)
 {
     fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
-    self->infos = zhash_new();
-    self->uuid = strdup (TST_UUID);
-    self->hostname = strdup (TST_HOSTNAME);
-    self->name = strdup (TST_NAME);
-    self->product_name = strdup (TST_PRODUCT_NAME);
-    self->location = strdup (TST_LOCATION);
-    self->version = strdup (TST_VERSION);
-    self->rest_root = strdup (rest_roots.at(0).c_str());
-    self->rest_port = strdup (rest_ports.at(0).c_str());
+    self->infos     = zhash_new();
+    self->uuid      = strdup (TST_UUID);
+    self->hostname  = strdup (TST_HOSTNAME);
+    self->name      = strdup (TST_NAME);
+    self->model     = strdup (TST_MODEL);
+    self->vendor    = strdup (TST_VENDOR);
+    self->serial    = strdup (TST_SERIAL);
+    self->location  = strdup (TST_LOCATION);
+    self->version   = strdup (TST_VERSION);
+    self->rest_path = strdup (TST_PATH);
+    self->rest_port = strdup (TST_PORT);
     return self;
 }
 
@@ -170,84 +194,68 @@ fty_info_t*
 fty_info_new (void)
 {
     fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
-    tntdb::Connection conn;
-    std::string url = std::string("mysql:db=box_utf8;user=") +
-    ((getenv("DB_USER")   == NULL) ? "root" : getenv("DB_USER")) +
-    ((getenv("DB_PASSWD") == NULL) ? ""     :   
-     std::string(";password=") + getenv("DB_PASSWD"));
-
-    try {
-        conn = tntdb::connectCached (url);
-    }
-    catch ( const std::exception &e) {
-        zsys_error ("DB: cannot connect, %s", e.what());
-    }    
     self->infos = zhash_new();
-    
-    // set uuid - generated by `uuid -v5 <name_space_based_on_uuid> <(Concatenation of UTF8 encoded: vendor + model + serial)>`
-    // TODO: /etc/release-details.json doesn't contain vendor, and serial number is empty 
-    self->uuid = strdup ("");
-    
     
     // set hostname
     char *hostname = (char *) malloc (HOST_NAME_MAX+1);
     int rv = gethostname (hostname, HOST_NAME_MAX+1);
     if (rv == -1) {
         zsys_warning ("fty_info could not be fully initialized (error while getting the hostname)");
-        self->hostname = strdup("");
+        self->hostname = strdup("locahost");
     }
     else {
         self->hostname = strdup (hostname);
     }
     zstr_free (&hostname);
-    zsys_debug ("hostname = '%s'", self->hostname);
-    
+    zsys_info ("fty-info:hostname  = '%s'", self->hostname);
+            
+    tntdb::Connection conn;
+
+    try {
+        conn = tntdb::connectCached (url);
+        conn.ping();
+        zsys_info("fty-info:DB connection OK",RELEASE_DETAILS);
+    }
+    catch ( const std::exception &e) {
+        zsys_error ("DB: cannot connect, %s", e.what());
+        conn = tntdb::Connection();
+    } 
     //set name
-    std::string name;
-    rv = s_select_rack_controller_name (conn, name);
-    if (rv < 0) {
-        zsys_warning ("fty_info could not be fully initialized (error while getting the name)");
-        self->name = strdup ("");
-    }
-    else {
-        self->name = strdup (name.c_str ());
-    }
-    zsys_debug ("name set to the value '%s'", self-> name);
+    self->name = s_select_rack_controller_name (conn, "NA");
+    zsys_info ("fty-info:name      = '%s'", self-> name);
     
-    // set product name - "hardware-catalog-number" from /etc/release-details.json (first part?)
-    std::ifstream f(RELEASE_DETAILS);
-    std::string product_name;
-    rv = s_get_product_name (f, product_name);
-    if (rv < 0) {
-        zsys_warning ("fty_info could not be fully initialized (error while getting the product name)");
-        self->product_name = strdup ("");
-    }
-    else {
-        self->product_name = strdup (product_name.c_str ());
-    }
-    zsys_debug ("Product name set to the value '%s'", self->product_name);
+    //set location (parent)
+    self->location  = s_select_rack_controller_parent (conn, self->name, "NA");
+    zsys_info ("fty-info:location  = '%s'", self->location);
+
+    //set uuid, vendor, model from /etc/release-details.json 
+    cxxtools::SerializationInfo *si = nullptr;
+    si = s_load_release_details();
+    self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
+    self->vendor = s_get_release_details (si, "hardware-vendor", "NA");
+    self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
+    self->model  = s_get_release_details (si, "hardware-catalog-number", "NA");
+    zsys_info ("fty-info:uuid      = '%s'", self->uuid);
+    zsys_info ("fty-info:vendor    = '%s'", self->vendor);
+    zsys_info ("fty-info:serial    = '%s'", self->serial);
+    zsys_info ("fty-info:model     = '%s'", self->model);
     
-    // set location (parent)
-    std::string parent;
-    rv = s_select_rack_controller_parent (conn, self->name, parent);
-    if (rv < 0) {
-        zsys_warning ("fty_info could not be fully initialized (error while getting the location)");
-        self->location = strdup ("");
-    }
-    else {
-        self->location = strdup (parent.c_str ());
-    }
-    zsys_debug ("location set to the value '%s'", self->location);
     
     // TODO: set version
-    self->version = strdup ("");
-    // TODO: set rest_root - what if we can find more than one?
-    self->rest_root = strdup ("");
-    // TODO: set rest_port - what if we can find more than one?
-    self->rest_port = 0;
+    self->version   = strdup ("NotImplemented");
+    // use default
+    self->rest_path = strdup ("/api/v1");
+    // use default
+    self->rest_port = strdup ("443");
+    
+    zsys_info ("fty-info:version   = '%s'", self->version);
+    zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
+    zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
 
-    conn.clearStatementCache ();
-    conn.close ();
+    tntdb::dropCached();
+     if(si)
+        delete si;
+    
     return self;
 }
 
@@ -263,10 +271,13 @@ fty_info_destroy (fty_info_t ** self_ptr)
         zstr_free (&self->uuid);
         zstr_free (&self->hostname);
         zstr_free (&self->name);
-        zstr_free (&self->product_name);
+        zstr_free (&self->model);
+        zstr_free (&self->vendor);
+        zstr_free (&self->serial);
         zstr_free (&self->location);
         zstr_free (&self->version);
-        zstr_free (&self->rest_root);
+        zstr_free (&self->rest_port);
+        zstr_free (&self->rest_path);
         // Free object itself
         free (self);
         *self_ptr = NULL;
@@ -282,7 +293,7 @@ fty_info_server (zsock_t *pipe, void *args)
 {
     char *name = (char *)args;
     if (!name) {
-        zsys_error ("Adress for fty-info actor is NULL");
+        zsys_error ("Address for fty-info actor is NULL");
         return;
     }
     bool verbose = false;
@@ -353,12 +364,13 @@ fty_info_server (zsock_t *pipe, void *args)
                  if (!message)
                     continue;
 
-                 char *command = zmsg_popstr (message);
+                 char *command = zmsg_popstr (message); 
                  if (!command) {
                     zmsg_destroy (&message);
-                    zsys_warning ("Empty command.");
+                    zsys_warning ("Empty subject.");
                     continue;
                  }
+                 //we assume all request command are MAILBOX DELIVER, and subject="info"
                  if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
                     zsys_warning ("fty-info: Received unexpected command '%s'", command);
                     zmsg_t *reply = zmsg_new ();
@@ -369,6 +381,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     continue;
                      
                  } else {
+                    zsys_debug ("fty-info:do '%s'", command);
                     zmsg_t *reply = zmsg_new ();
                     char *zuuid = zmsg_popstr (message);
                     fty_info_t *self;
@@ -377,22 +390,24 @@ fty_info_server (zsock_t *pipe, void *args)
                     }
                     if (streq(command, "INFO-TEST")) {
                         self = fty_info_test_new ();
- 
-                    }
+                     }
                     //prepare replied msg content
                     zmsg_addstrf (reply, "%s", zuuid);
                     zhash_insert(self->infos, INFO_UUID, self->uuid);
                     zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
                     zhash_insert(self->infos, INFO_NAME, self->name);
-                    zhash_insert(self->infos, INFO_PRODUCT_NAME, self->product_name);
+                    zhash_insert(self->infos, INFO_VENDOR, self->vendor);
+                    zhash_insert(self->infos, INFO_MODEL, self->model);
+                    zhash_insert(self->infos, INFO_SERIAL, self->serial);
                     zhash_insert(self->infos, INFO_LOCATION, self->location);
                     zhash_insert(self->infos, INFO_VERSION, self->version);
-                    zhash_insert(self->infos, INFO_REST_ROOT, self->rest_root);
+                    zhash_insert(self->infos, INFO_REST_PATH, self->rest_path);
                     zhash_insert(self->infos, INFO_REST_PORT, self->rest_port);
+                    
                     zframe_t * frame_infos = zhash_pack(self->infos);
                     zmsg_append (reply, &frame_infos);
-               
                     mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                    zframe_destroy(&frame_infos);
                     zstr_free (&zuuid);
                     fty_info_destroy (&self);
                 }
@@ -410,7 +425,7 @@ fty_info_server (zsock_t *pipe, void *args)
 void
 fty_info_server_test (bool verbose)
 {
-    printf (" * fty_info_server: ");
+    printf (" * fty_info_server_test: ");
 
     //  @selftest
 
@@ -421,68 +436,112 @@ fty_info_server_test (bool verbose)
    if (verbose)
        zstr_send (server, "VERBOSE");
 
-   mlm_client_t *ui = mlm_client_new ();
-   mlm_client_connect (ui, endpoint, 1000, "UI");
-   zuuid_t *zuuid = zuuid_new ();
+   mlm_client_t *client = mlm_client_new ();
+   mlm_client_connect (client, endpoint, 1000, "fty_info_server_test");
    
-   zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info-test");
-   if (verbose)
+   
+   zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
+      if (verbose)
        zstr_send (info_server, "VERBOSE");
    zstr_sendx (info_server, "CONNECT", endpoint, NULL);
    zclock_sleep (1000);
-
-    // Test #1: command INFO
-    {
-    zmsg_t *command = zmsg_new ();
-    zmsg_addstrf (command, "%s", "INFO-TEST");
-    zmsg_addstrf (command, "%s", zuuid_str_canonical (zuuid));
-    mlm_client_sendto (ui, "fty-info-test", FTY_INFO_AGENT, NULL, 1000, &command);
-
-    zmsg_t *recv = mlm_client_recv (ui);
-
-    assert (zmsg_size (recv) == 2);
-    zsys_debug ("fty-info: zmsg_size = %d",zmsg_size (recv));
-    char *zuuid_reply = zmsg_popstr (recv);
-    assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
-    
-    zframe_t *frame_infos = zmsg_next (recv);
-    zhash_t *infos = zhash_unpack(frame_infos); 
-    
-    char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
-    assert(uuid && streq (uuid,TST_UUID));
-    zsys_debug ("fty-info: uuid = '%s'", uuid);
-    char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
-    assert(hostname && streq (hostname, TST_HOSTNAME));
-    zsys_debug ("fty-info: hostname = '%s'", hostname);
-    char * name = (char *) zhash_lookup (infos, INFO_NAME);
-    assert(name && streq (name, TST_NAME));
-    zsys_debug ("fty-info: name = '%s'", name);
-    char * product_name = (char *) zhash_lookup (infos, INFO_PRODUCT_NAME);
-    assert(product_name && streq (product_name, TST_PRODUCT_NAME));
-    zsys_debug ("fty-info: product_name = '%s'", product_name);
-    char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
-    assert(location && streq (location, TST_LOCATION));
-    zsys_debug ("fty-info: location = '%s'", location);
-    char * version = (char *) zhash_lookup (infos, INFO_VERSION);
-    assert(version && streq (version, TST_VERSION));
-    zsys_debug ("fty-info: version = '%s'", version);
-    char * rest_root = (char *) zhash_lookup (infos, INFO_REST_ROOT);
-    assert(rest_root && streq (rest_root, rest_roots.at(0).c_str()));
-    zsys_debug ("fty-info: rest_root = '%s'", rest_root);
-    char * rest_port = (char *) zhash_lookup (infos, INFO_REST_PORT);
-    assert(rest_port && streq (rest_port, rest_ports.at(0).c_str()));
-    zsys_debug ("fty-info: rest_port = '%s'", rest_port);
-    zhash_destroy(&infos);
  
-    
-    zmsg_destroy (&recv);
-    printf ("zuuid = '%s'\n", zuuid_str_canonical (zuuid));
-    zuuid_destroy (&zuuid);
+    // Test #1: request INFO-TEST
+    {
+        zsys_debug ("fty-info-test:Test #1");
+        zmsg_t *request = zmsg_new ();
+        zmsg_addstr (request, "INFO-TEST");
+        zuuid_t *zuuid = zuuid_new ();
+        zmsg_addstrf (request, "%s", zuuid_str_canonical (zuuid));
+        mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &request);
+
+        zmsg_t *recv = mlm_client_recv (client);
+
+        assert (zmsg_size (recv) == 2);
+        zsys_debug ("fty-info-test: zmsg_size = %d",zmsg_size (recv));
+        char *zuuid_reply = zmsg_popstr (recv);
+        assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+
+        zframe_t *frame_infos = zmsg_next (recv);
+        zhash_t *infos = zhash_unpack(frame_infos); 
+
+        char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
+        assert(uuid && streq (uuid,TST_UUID));
+        zsys_debug ("fty-info-test: uuid = '%s'", uuid);
+        char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
+        assert(hostname && streq (hostname, TST_HOSTNAME));
+        zsys_debug ("fty-info-test: hostname = '%s'", hostname);
+        char * name = (char *) zhash_lookup (infos, INFO_NAME);
+        assert(name && streq (name, TST_NAME));
+        zsys_debug ("fty-info-test: name = '%s'", name);
+        char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
+        assert(vendor && streq (vendor, TST_VENDOR));
+        zsys_debug ("fty-info-test: vendor = '%s'", vendor);
+        char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
+        assert(serial && streq (serial, TST_SERIAL));
+        zsys_debug ("fty-info-test: serial = '%s'", serial);
+        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
+        assert(model && streq (model, TST_MODEL));
+        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
+        assert(location && streq (location, TST_LOCATION));
+        zsys_debug ("fty-info-test: location = '%s'", location);
+        char * version = (char *) zhash_lookup (infos, INFO_VERSION);
+        assert(version && streq (version, TST_VERSION));
+        zsys_debug ("fty-info-test: version = '%s'", version);
+        char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
+        assert(rest_root && streq (rest_root, TST_PATH));
+        zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
+        char * rest_port = (char *) zhash_lookup (infos, INFO_REST_PORT);
+        assert(rest_port && streq (rest_port, TST_PORT));
+        zsys_debug ("fty-info-test: rest_port = '%s'", rest_port);
+        zstr_free (&zuuid_reply);
+        zhash_destroy(&infos);
+        zmsg_destroy (&recv);
+        zmsg_destroy (&request);
+        zuuid_destroy (&zuuid);
+        zsys_info ("fty-info-test:Test #1: OK");
     }
+   
+    // Test #2: request INFO
+   /*
+    {
+        zsys_debug ("fty-info-test:Test #2");
+        zmsg_t *request = zmsg_new ();
+        zmsg_addstr (request, "INFO");
+        zuuid_t *zuuid = zuuid_new ();
+        zmsg_addstrf (request, "%s", zuuid_str_canonical (zuuid));
+        mlm_client_sendto (client, "fty-info", "INFO", NULL, 1000, &request);
+
+        zmsg_t *recv = mlm_client_recv (client);
+
+        assert (zmsg_size (recv) == 2);
+        char *zuuid_reply = zmsg_popstr (recv);
+        assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+
+        zframe_t *frame_infos = zmsg_next (recv);
+        zhash_t *infos = zhash_unpack(frame_infos); 
+
+        char *value = (char *) zhash_first (infos);   // first value
+        while ( value != NULL )
+        {
+            char *key = (char *) zhash_cursor (infos);   // key of this value
+            zsys_debug ("fty-info-test: %s = %s",key,value);
+            value     = (char *) zhash_next (infos);   // next value
+        }
+        zstr_free (&zuuid_reply);
+        zhash_destroy(&infos);
+        zmsg_destroy (&recv);
+        zmsg_destroy (&request);
+        zuuid_destroy (&zuuid);
+        zsys_info ("fty-info-test:Test #2: OK");
+    }
+    */
 
     //  @end
-    printf ("OK\n");
     zactor_destroy (&info_server);
-    mlm_client_destroy (&ui);
+    mlm_client_destroy (&client);
     zactor_destroy (&server);
+    zsys_info ("OK\n");
+    
 }
