@@ -53,6 +53,12 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 #include "fty_info_classes.h"
 
+static std::string url =
+    std::string("mysql:db=box_utf8;user=") +
+    ((getenv("DB_USER")   == NULL) ? "root" : getenv("DB_USER")) +
+    ((getenv("DB_PASSWD") == NULL) ? ""     :
+    std::string(";password=") + getenv("DB_PASSWD"));
+
 struct _fty_info_t {
     zhash_t *infos;
     char *uuid;
@@ -102,7 +108,7 @@ s_get_release_details
     }
     return strdup(value.c_str());
 }
-
+/*
 static char*
 s_select_rack_controller_parent
     (tntdb::Connection &conn,
@@ -136,6 +142,7 @@ s_select_rack_controller_parent
 }
 
 //TODO: change after we add display name
+
 static char*
 s_select_rack_controller_name
     (tntdb::Connection &conn,
@@ -164,7 +171,7 @@ s_select_rack_controller_name
         zsys_error ("Error: %s", e.what ());
     }
     return strdup(name.c_str());
-}
+}*/
 fty_info_t*
 fty_info_test_new (void)
 {
@@ -203,29 +210,27 @@ fty_info_new (void)
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
             
     tntdb::Connection conn;
+
     try {
-        std::string url = std::string("mysql:db=box_utf8;user=") +
-        ((getenv("DB_USER")   == NULL) ? "root" : getenv("DB_USER")) +
-        ((getenv("DB_PASSWD") == NULL) ? ""     :   
-        std::string(";password=") + getenv("DB_PASSWD"));
         conn = tntdb::connectCached (url);
+        //conn.ping();
         zsys_info("fty-info:DB connection OK",RELEASE_DETAILS);
     }
     catch ( const std::exception &e) {
         zsys_error ("DB: cannot connect, %s", e.what());
         conn = tntdb::Connection();
     } 
-     
     //set name
-    self->name = s_select_rack_controller_name (conn,"NA");
+    self->name = strdup("name"); //s_select_rack_controller_name (conn,"NA");
     zsys_info ("fty-info:name      = '%s'", self-> name);
     
     //set location (parent)
-    self->location  = s_select_rack_controller_parent (conn, self->name, "NA");
+    self->location  = strdup("location"); //s_select_rack_controller_parent (conn, self->name, "NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set uuid, vendor, model from /etc/release-details.json 
-    cxxtools::SerializationInfo *si = s_load_release_details();
+    cxxtools::SerializationInfo *si = nullptr;
+    si = s_load_release_details();
     self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
     self->vendor = s_get_release_details (si, "hardware-vendor", "NA");
     self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
@@ -234,6 +239,7 @@ fty_info_new (void)
     zsys_info ("fty-info:vendor    = '%s'", self->vendor);
     zsys_info ("fty-info:serial    = '%s'", self->serial);
     zsys_info ("fty-info:model     = '%s'", self->model);
+    
     
     // TODO: set version
     self->version   = strdup ("NotImplemented");
@@ -246,13 +252,10 @@ fty_info_new (void)
     zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
     zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
 
-    if(!!conn)
-    {
-        conn.clearStatementCache();
-        conn.close ();
-    }
-    if(si)
-        free(si);
+    tntdb::dropCached();
+     if(si)
+        delete si;
+    
     return self;
 }
 
@@ -269,6 +272,7 @@ fty_info_destroy (fty_info_t ** self_ptr)
         zstr_free (&self->hostname);
         zstr_free (&self->name);
         zstr_free (&self->model);
+        zstr_free (&self->vendor);
         zstr_free (&self->serial);
         zstr_free (&self->location);
         zstr_free (&self->version);
@@ -372,6 +376,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     zmsg_t *reply = zmsg_new ();
                     zmsg_addstr(reply, "ERROR");
                     mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                    zstr_free (&command);
                     zmsg_destroy (&message);
                     continue;
                      
@@ -402,10 +407,11 @@ fty_info_server (zsock_t *pipe, void *args)
                     zframe_t * frame_infos = zhash_pack(self->infos);
                     zmsg_append (reply, &frame_infos);
                     mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
-                    
+                    zframe_destroy(&frame_infos);
                     zstr_free (&zuuid);
                     fty_info_destroy (&self);
                 }
+                zstr_free (&command);
                 zmsg_destroy (&message);
              }
     }
@@ -435,11 +441,11 @@ fty_info_server_test (bool verbose)
    
    
    zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
-   if (verbose)
+      if (verbose)
        zstr_send (info_server, "VERBOSE");
    zstr_sendx (info_server, "CONNECT", endpoint, NULL);
    zclock_sleep (1000);
-
+ 
     // Test #1: request INFO-TEST
     {
         zsys_debug ("fty-info-test:Test #1");
@@ -489,19 +495,19 @@ fty_info_server_test (bool verbose)
         char * rest_port = (char *) zhash_lookup (infos, INFO_REST_PORT);
         assert(rest_port && streq (rest_port, TST_PORT));
         zsys_debug ("fty-info-test: rest_port = '%s'", rest_port);
+        zstr_free (&zuuid_reply);
         zhash_destroy(&infos);
-
         zmsg_destroy (&recv);
+        zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #1: OK");
     }
-   
    
     // Test #2: request INFO
     {
         zsys_debug ("fty-info-test:Test #2");
         zmsg_t *request = zmsg_new ();
-        zmsg_addstr (request, "INFO-TEST");
+        zmsg_addstr (request, "INFO");
         zuuid_t *zuuid = zuuid_new ();
         zmsg_addstrf (request, "%s", zuuid_str_canonical (zuuid));
         mlm_client_sendto (client, "fty-info", "INFO", NULL, 1000, &request);
@@ -522,9 +528,10 @@ fty_info_server_test (bool verbose)
             zsys_debug ("fty-info-test: %s = %s",key,value);
             value     = (char *) zhash_next (infos);   // next value
         }
-
+        zstr_free (&zuuid_reply);
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
+        zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #2: OK");
     }
@@ -534,4 +541,5 @@ fty_info_server_test (bool verbose)
     mlm_client_destroy (&client);
     zactor_destroy (&server);
     zsys_info ("OK\n");
+    
 }
