@@ -108,7 +108,7 @@ s_get_release_details
     }
     return strdup(value.c_str());
 }
-/*
+
 static char*
 s_select_rack_controller_parent
     (tntdb::Connection &conn,
@@ -171,7 +171,7 @@ s_select_rack_controller_name
         zsys_error ("Error: %s", e.what ());
     }
     return strdup(name.c_str());
-}*/
+}
 fty_info_t*
 fty_info_test_new (void)
 {
@@ -213,7 +213,7 @@ fty_info_new (void)
 
     try {
         conn = tntdb::connectCached (url);
-        //conn.ping();
+        conn.ping();
         zsys_info("fty-info:DB connection OK",RELEASE_DETAILS);
     }
     catch ( const std::exception &e) {
@@ -221,11 +221,11 @@ fty_info_new (void)
         conn = tntdb::Connection();
     } 
     //set name
-    self->name = strdup("name"); //s_select_rack_controller_name (conn,"NA");
+    self->name = s_select_rack_controller_name (conn, "NA");
     zsys_info ("fty-info:name      = '%s'", self-> name);
     
     //set location (parent)
-    self->location  = strdup("location"); //s_select_rack_controller_parent (conn, self->name, "NA");
+    self->location  = s_select_rack_controller_parent (conn, self->name, "NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set uuid, vendor, model from /etc/release-details.json 
