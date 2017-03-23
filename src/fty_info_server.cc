@@ -504,6 +504,7 @@ fty_info_server_test (bool verbose)
     }
    
     // Test #2: request INFO
+   /*
     {
         zsys_debug ("fty-info-test:Test #2");
         zmsg_t *request = zmsg_new ();
@@ -535,6 +536,7 @@ fty_info_server_test (bool verbose)
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #2: OK");
     }
+    */
 
     //  @end
     zactor_destroy (&info_server);
