@@ -29,13 +29,16 @@
 #define FTY_INFO_AGENT "fty-info"
 #define FTY_INFO_CMD "INFO"
 
-#define INFO_UUID  "uuid"
+#define INFO_UUID      "uuid"
 #define INFO_HOSTNAME  "hostname"
-#define INFO_NAME  "name"
-#define INFO_PRODUCT_NAME "product_name"
+#define INFO_NAME      "name"
+#define INFO_VENDOR    "vendor"
+#define INFO_SERIAL    "serial"
+#define INFO_MODEL     "model"
 #define INFO_LOCATION  "location"
-#define INFO_VERSION  "version"
-#define INFO_REST_ROOT  "rest_root"
-#define INFO_REST_PORT  "rest_port"
+#define INFO_VERSION   "version"
+#define INFO_REST_PATH "rest_path"
+#define INFO_REST_PORT "rest_port"
+
 
 #endif
