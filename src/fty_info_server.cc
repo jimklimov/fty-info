@@ -1,21 +1,21 @@
 /*  =========================================================================
     fty_info_server - 42ity info server
 
-    Copyright (C) 2014 - 2017 Eaton                                        
-                                                                           
-    This program is free software; you can redistribute it and/or modify   
-    it under the terms of the GNU General Public License as published by   
-    the Free Software Foundation; either version 2 of the License, or      
-    (at your option) any later version.                                    
-                                                                           
-    This program is distributed in the hope that it will be useful,        
-    but WITHOUT ANY WARRANTY; without even the implied warranty of         
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
-    GNU General Public License for more details.                           
-                                                                           
+    Copyright (C) 2014 - 2017 Eaton
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.            
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
     =========================================================================
 */
 
@@ -138,7 +138,7 @@ s_select_rack_controller_parent
         zsys_error ("Error: %s", e.what ());
     }
     return strdup(parent_name.c_str());
-    
+
 }
 
 //TODO: change after we add display name
@@ -195,7 +195,7 @@ fty_info_new (void)
 {
     fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
     self->infos = zhash_new();
-    
+
     // set hostname
     char *hostname = (char *) malloc (HOST_NAME_MAX+1);
     int rv = gethostname (hostname, HOST_NAME_MAX+1);
@@ -208,7 +208,7 @@ fty_info_new (void)
     }
     zstr_free (&hostname);
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
-            
+
     tntdb::Connection conn;
 
     try {
@@ -219,16 +219,16 @@ fty_info_new (void)
     catch ( const std::exception &e) {
         zsys_error ("DB: cannot connect, %s", e.what());
         conn = tntdb::Connection();
-    } 
+    }
     //set name
     self->name = s_select_rack_controller_name (conn, "NA");
     zsys_info ("fty-info:name      = '%s'", self-> name);
-    
+
     //set location (parent)
     self->location  = s_select_rack_controller_parent (conn, self->name, "NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
-    //set uuid, vendor, model from /etc/release-details.json 
+    //set uuid, vendor, model from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
     si = s_load_release_details();
     self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
@@ -239,15 +239,15 @@ fty_info_new (void)
     zsys_info ("fty-info:vendor    = '%s'", self->vendor);
     zsys_info ("fty-info:serial    = '%s'", self->serial);
     zsys_info ("fty-info:model     = '%s'", self->model);
-    
-    
+
+
     // TODO: set version
     self->version   = strdup ("NotImplemented");
     // use default
     self->rest_path = strdup ("/api/v1");
     // use default
     self->rest_port = strdup ("443");
-    
+
     zsys_info ("fty-info:version   = '%s'", self->version);
     zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
     zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
@@ -255,7 +255,7 @@ fty_info_new (void)
     tntdb::dropCached();
      if(si)
         delete si;
-    
+
     return self;
 }
 
@@ -302,7 +302,7 @@ fty_info_server (zsock_t *pipe, void *args)
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (client), NULL);
     assert (poller);
 
-    zsock_signal (pipe, 0); 
+    zsock_signal (pipe, 0);
     zsys_info ("fty-info: Started");
 
     while (!zsys_interrupted)
@@ -319,7 +319,7 @@ fty_info_server (zsock_t *pipe, void *args)
              zmsg_t *message = zmsg_recv (pipe);
              if (!message)
                  break;
-             
+
              char *command = zmsg_popstr (message);
              if (!command) {
                  zmsg_destroy (&message);
@@ -364,7 +364,7 @@ fty_info_server (zsock_t *pipe, void *args)
                  if (!message)
                     continue;
 
-                 char *command = zmsg_popstr (message); 
+                 char *command = zmsg_popstr (message);
                  if (!command) {
                     zmsg_destroy (&message);
                     zsys_warning ("Empty subject.");
@@ -379,7 +379,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     zstr_free (&command);
                     zmsg_destroy (&message);
                     continue;
-                     
+
                  } else {
                     zsys_debug ("fty-info:do '%s'", command);
                     zmsg_t *reply = zmsg_new ();
@@ -403,7 +403,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     zhash_insert(self->infos, INFO_VERSION, self->version);
                     zhash_insert(self->infos, INFO_REST_PATH, self->rest_path);
                     zhash_insert(self->infos, INFO_REST_PORT, self->rest_port);
-                    
+
                     zframe_t * frame_infos = zhash_pack(self->infos);
                     zmsg_append (reply, &frame_infos);
                     mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
@@ -429,23 +429,23 @@ fty_info_server_test (bool verbose)
 
     //  @selftest
 
-   static const char* endpoint = "inproc://fty-info-test";
+    static const char* endpoint = "inproc://fty-info-test";
 
-   zactor_t *server = zactor_new (mlm_server, (void*) "Malamute");
-   zstr_sendx (server, "BIND", endpoint, NULL);
-   if (verbose)
-       zstr_send (server, "VERBOSE");
+    zactor_t *server = zactor_new (mlm_server, (void*) "Malamute");
+    zstr_sendx (server, "BIND", endpoint, NULL);
+    if (verbose)
+        zstr_send (server, "VERBOSE");
 
-   mlm_client_t *client = mlm_client_new ();
-   mlm_client_connect (client, endpoint, 1000, "fty_info_server_test");
-   
-   
-   zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
-      if (verbose)
-       zstr_send (info_server, "VERBOSE");
-   zstr_sendx (info_server, "CONNECT", endpoint, NULL);
-   zclock_sleep (1000);
- 
+    mlm_client_t *client = mlm_client_new ();
+    mlm_client_connect (client, endpoint, 1000, "fty_info_server_test");
+
+
+    zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
+    if (verbose)
+        zstr_send (info_server, "VERBOSE");
+    zstr_sendx (info_server, "CONNECT", endpoint, NULL);
+    zclock_sleep (1000);
+
     // Test #1: request INFO-TEST
     {
         zsys_debug ("fty-info-test:Test #1");
@@ -463,7 +463,7 @@ fty_info_server_test (bool verbose)
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
 
         zframe_t *frame_infos = zmsg_next (recv);
-        zhash_t *infos = zhash_unpack(frame_infos); 
+        zhash_t *infos = zhash_unpack(frame_infos);
 
         char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
         assert(uuid && streq (uuid,TST_UUID));
@@ -502,9 +502,7 @@ fty_info_server_test (bool verbose)
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #1: OK");
     }
-   
     // Test #2: request INFO
-   /*
     {
         zsys_debug ("fty-info-test:Test #2");
         zmsg_t *request = zmsg_new ();
@@ -520,11 +518,10 @@ fty_info_server_test (bool verbose)
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
 
         zframe_t *frame_infos = zmsg_next (recv);
-        zhash_t *infos = zhash_unpack(frame_infos); 
+        zhash_t *infos = zhash_unpack(frame_infos);
 
         char *value = (char *) zhash_first (infos);   // first value
-        while ( value != NULL )
-        {
+        while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
             value     = (char *) zhash_next (infos);   // next value
@@ -536,12 +533,10 @@ fty_info_server_test (bool verbose)
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #2: OK");
     }
-    */
 
     //  @end
     zactor_destroy (&info_server);
     mlm_client_destroy (&client);
     zactor_destroy (&server);
     zsys_info ("OK\n");
-    
 }
