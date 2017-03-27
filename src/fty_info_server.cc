@@ -307,113 +307,142 @@ fty_info_server (zsock_t *pipe, void *args)
 
     while (!zsys_interrupted)
     {
-         void *which = zpoller_wait (poller, TIMEOUT_MS);
-         if (which == NULL) {
-             if (zpoller_terminated (poller) || zsys_interrupted) {
-                 break;
-             }
-         }
-         if (which == pipe) {
-             if (verbose)
-                 zsys_debug ("which == pipe");
-             zmsg_t *message = zmsg_recv (pipe);
-             if (!message)
-                 break;
+        void *which = zpoller_wait (poller, TIMEOUT_MS);
+        if (which == NULL) {
+            if (zpoller_terminated (poller) || zsys_interrupted) {
+                break;
+            }
+        }
+        if (which == pipe) {
+            if (verbose)
+                zsys_debug ("which == pipe");
+            zmsg_t *message = zmsg_recv (pipe);
+            if (!message)
+                break;
              
-             char *command = zmsg_popstr (message);
-             if (!command) {
-                 zmsg_destroy (&message);
-                 zsys_warning ("Empty command.");
-                 continue;
-             }
-             if (streq(command, "$TERM")) {
-                 zsys_info ("Got $TERM");
-                 zmsg_destroy (&message);
-                 zstr_free (&command);
-                 break;
-             }
-             else
-                 if (streq(command, "CONNECT"))
-                 {
-                     char *endpoint = zmsg_popstr (message);
+            char *command = zmsg_popstr (message);
+            if (!command) {
+                zmsg_destroy (&message);
+                zsys_warning ("Empty command.");
+                continue;
+            }
+            if (streq(command, "$TERM")) {
+                zsys_info ("Got $TERM");
+                zmsg_destroy (&message);
+                zstr_free (&command);
+                break;
+            }
+            else
+                if (streq(command, "CONNECT")) {
+                    char *endpoint = zmsg_popstr (message);
 
-                     if (endpoint) {
-                         zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, name);
-                         int rv = mlm_client_connect (client, endpoint, 1000, name);
-                         if (rv == -1)
-                             zsys_error("mlm_client_connect failed\n");
-                     }
-                     zstr_free (&endpoint);
-                 }
-                 else
-                     if (streq (command, "VERBOSE"))
-                     {
-                         verbose = true;
-                         zsys_debug ("fty-info: VERBOSE=true");
-                     }
-                     else {
-                         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
-                     }
-             zstr_free (&command);
-             zmsg_destroy (&message);
-         }
-         else
-             if (which == mlm_client_msgpipe (client)) {
-                 //TODO: implement actor interface
-                 zmsg_t *message = mlm_client_recv (client);
-                 if (!message)
+                    if (endpoint) {
+                        zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, name);
+                        int rv = mlm_client_connect (client, endpoint, 1000, name);
+                        if (rv == -1)
+                            zsys_error("mlm_client_connect failed\n");
+                    }
+                    zstr_free (&endpoint);
+                }
+                else
+                    if (streq (command, "VERBOSE")) {
+                        verbose = true;
+                        zsys_debug ("fty-info: VERBOSE=true");
+                    }
+                    else
+                        if (streq (command, "CONSUMER")) {
+                            char* stream = zmsg_popstr (message);
+                            char* pattern = zmsg_popstr (message);
+                            int rv = mlm_client_set_consumer (client, stream, pattern);
+                            if (rv == -1)
+                                zsys_error ("%s: can't set consumer on stream '%s', '%s'", name, stream, pattern);
+                            zstr_free (&pattern);
+                            zstr_free (&stream);
+                        }
+                        else {
+                            zsys_error ("fty-info: Unknown actor command: %s.\n", command);
+                        }
+            zstr_free (&command);
+            zmsg_destroy (&message);
+        }
+        else
+            if (which == mlm_client_msgpipe (client)) {
+                zmsg_t *message = mlm_client_recv (client);
+                if (!message)
                     continue;
+                if (is_fty_proto (message)) {
+                    fty_proto_t *bmessage = fty_proto_decode (&message);
+                    if (!bmessage ) {
+                        zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (client));
+                        continue;
+                    }
 
-                 char *command = zmsg_popstr (message); 
-                 if (!command) {
-                    zmsg_destroy (&message);
-                    zsys_warning ("Empty subject.");
-                    continue;
-                 }
-                 //we assume all request command are MAILBOX DELIVER, and subject="info"
-                 if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
-                    zsys_warning ("fty-info: Received unexpected command '%s'", command);
-                    zmsg_t *reply = zmsg_new ();
-                    zmsg_addstr(reply, "ERROR");
-                    mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                    if (fty_proto_id (bmessage) == FTY_PROTO_ASSET) {
+                        //TODO: check whether the message is relevant for us
+                        //if yes, update info structure
+                        // send the updated information
+                        fty_proto_destroy (&bmessage);
+                        continue;
+                    }
+                    else {
+                        zsys_warning ("Weird fty_proto msg received, id = '%d', command = '%s', subject = '%s', sender = '%s'",
+                            fty_proto_id (bmessage), mlm_client_command (client), mlm_client_subject (client), mlm_client_sender (client));
+                        fty_proto_destroy (&bmessage);
+                        continue;
+                    }
+                }
+                else {
+                    char *command = zmsg_popstr (message);
+                    if (!command) {
+                        zmsg_destroy (&message);
+                        zsys_warning ("Empty subject.");
+                        continue;
+                    }
+                    //we assume all request command are MAILBOX DELIVER, and subject="info"
+                    if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
+                        zsys_warning ("fty-info: Received unexpected command '%s'", command);
+                        zmsg_t *reply = zmsg_new ();
+                        zmsg_addstr(reply, "ERROR");
+                        mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                        zstr_free (&command);
+                        zmsg_destroy (&message);
+                        continue;
+                    }
+                    else {
+                        zsys_debug ("fty-info:do '%s'", command);
+                        zmsg_t *reply = zmsg_new ();
+                        char *zuuid = zmsg_popstr (message);
+                        fty_info_t *self;
+                        if (streq(command, "INFO")) {
+                            self = fty_info_new ();
+                        }
+                        if (streq(command, "INFO-TEST")) {
+                            self = fty_info_test_new ();
+                        }
+                        //prepare replied msg content
+                        zmsg_addstrf (reply, "%s", zuuid);
+                        zhash_insert(self->infos, INFO_UUID, self->uuid);
+                        zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
+                        zhash_insert(self->infos, INFO_NAME, self->name);
+                        zhash_insert(self->infos, INFO_VENDOR, self->vendor);
+                        zhash_insert(self->infos, INFO_MODEL, self->model);
+                        zhash_insert(self->infos, INFO_SERIAL, self->serial);
+                        zhash_insert(self->infos, INFO_LOCATION, self->location);
+                        zhash_insert(self->infos, INFO_VERSION, self->version);
+                        zhash_insert(self->infos, INFO_REST_PATH, self->rest_path);
+                        zhash_insert(self->infos, INFO_REST_PORT, self->rest_port);
+
+                        zframe_t * frame_infos = zhash_pack(self->infos);
+                        zmsg_append (reply, &frame_infos);
+                        mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
+                        zframe_destroy(&frame_infos);
+                        zstr_free (&zuuid);
+                        fty_info_destroy (&self);
+                    }
                     zstr_free (&command);
                     zmsg_destroy (&message);
-                    continue;
-                     
-                 } else {
-                    zsys_debug ("fty-info:do '%s'", command);
-                    zmsg_t *reply = zmsg_new ();
-                    char *zuuid = zmsg_popstr (message);
-                    fty_info_t *self;
-                    if (streq(command, "INFO")) {
-                        self = fty_info_new ();
-                    }
-                    if (streq(command, "INFO-TEST")) {
-                        self = fty_info_test_new ();
-                     }
-                    //prepare replied msg content
-                    zmsg_addstrf (reply, "%s", zuuid);
-                    zhash_insert(self->infos, INFO_UUID, self->uuid);
-                    zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
-                    zhash_insert(self->infos, INFO_NAME, self->name);
-                    zhash_insert(self->infos, INFO_VENDOR, self->vendor);
-                    zhash_insert(self->infos, INFO_MODEL, self->model);
-                    zhash_insert(self->infos, INFO_SERIAL, self->serial);
-                    zhash_insert(self->infos, INFO_LOCATION, self->location);
-                    zhash_insert(self->infos, INFO_VERSION, self->version);
-                    zhash_insert(self->infos, INFO_REST_PATH, self->rest_path);
-                    zhash_insert(self->infos, INFO_REST_PORT, self->rest_port);
-                    
-                    zframe_t * frame_infos = zhash_pack(self->infos);
-                    zmsg_append (reply, &frame_infos);
-                    mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
-                    zframe_destroy(&frame_infos);
-                    zstr_free (&zuuid);
-                    fty_info_destroy (&self);
                 }
-                zstr_free (&command);
-                zmsg_destroy (&message);
-             }
+            }
     }
     zpoller_destroy (&poller);
     mlm_client_destroy (&client);
