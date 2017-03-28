@@ -44,26 +44,17 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 #include <string>
 #include <unistd.h>
 #include <bits/local_lim.h>
-#include <tntdb/connect.h>
-#include <tntdb/result.h>
-#include <tntdb/error.h>
 #include <cxxtools/jsondeserializer.h>
 #include <istream>
 #include <fstream>
 
 #include "fty_info_classes.h"
 
-static std::string url =
-    std::string("mysql:db=box_utf8;user=") +
-    ((getenv("DB_USER")   == NULL) ? "root" : getenv("DB_USER")) +
-    ((getenv("DB_PASSWD") == NULL) ? ""     :
-    std::string(";password=") + getenv("DB_PASSWD"));
-
 struct _fty_info_t {
     zhash_t *infos;
     char *uuid;
     char *hostname;
-    char *name;
+    char *iname;
     char *model;
     char *vendor;
     char *serial;
@@ -109,69 +100,7 @@ s_get_release_details
     return strdup(value.c_str());
 }
 
-static char*
-s_select_rack_controller_parent
-    (tntdb::Connection &conn,
-     char *name,
-     const char * dfl)
-{
-    std::string parent_name = dfl;
-    if (!conn)return strdup(dfl);
-    try {
-        tntdb::Statement st = conn.prepareCached(
-        " SELECT "
-        "   t1.parent_name "
-        " FROM "
-        "   v_bios_asset_element t1"
-        " WHERE "
-        "   t1.name = :name "
-        );
-        tntdb::Result result = st.set ("name", name).select ();
-        if (result.size () > 1) {
-            zsys_warning ("asset '%s' has more than one parent, DB is messed up",name);
-        }
-        for (auto &row: result) {
-            row ["parent_name"].get (parent_name);
-        }
-    }
-    catch (const std::exception& e) {
-        zsys_error ("Error: %s", e.what ());
-    }
-    return strdup(parent_name.c_str());
 
-}
-
-//TODO: change after we add display name
-
-static char*
-s_select_rack_controller_name
-    (tntdb::Connection &conn,
-     const char * dfl)
-{
-    std::string name;
-    if (!conn)return strdup(dfl);
-    try {
-        tntdb::Statement st = conn.prepareCached(
-        " SELECT "
-        "   t1.name "
-        " FROM "
-        "   (v_bios_asset_element t1 INNER JOIN v_bios_asset_device_type t2 ON (t1.id_subtype = t2.id))"
-        " WHERE "
-        "   t2.name = 'rack controller'"
-        );
-        tntdb::Result result = st.select ();
-        if (result.size () > 1) {
-            zsys_warning ("fty-info found more than one RC, not sure what to do");
-        }
-        for (auto &row: result) {
-            row ["name"].get (name);
-        }
-    }
-    catch (const std::exception& e) {
-        zsys_error ("Error: %s", e.what ());
-    }
-    return strdup(name.c_str());
-}
 fty_info_t*
 fty_info_test_new (void)
 {
@@ -179,7 +108,7 @@ fty_info_test_new (void)
     self->infos     = zhash_new();
     self->uuid      = strdup (TST_UUID);
     self->hostname  = strdup (TST_HOSTNAME);
-    self->name      = strdup (TST_NAME);
+    self->iname      = strdup (TST_NAME);
     self->model     = strdup (TST_MODEL);
     self->vendor    = strdup (TST_VENDOR);
     self->serial    = strdup (TST_SERIAL);
@@ -191,7 +120,7 @@ fty_info_test_new (void)
 }
 
 fty_info_t*
-fty_info_new (void)
+fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
 {
     fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
     self->infos = zhash_new();
@@ -209,23 +138,18 @@ fty_info_new (void)
     zstr_free (&hostname);
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
 
-    tntdb::Connection conn;
-
-    try {
-        conn = tntdb::connectCached (url);
-        conn.ping();
-        zsys_info("fty-info:DB connection OK",RELEASE_DETAILS);
-    }
-    catch ( const std::exception &e) {
-        zsys_error ("DB: cannot connect, %s", e.what());
-        conn = tntdb::Connection();
-    }
     //set name
-    self->name = s_select_rack_controller_name (conn, "NA");
-    zsys_info ("fty-info:name      = '%s'", self-> name);
+    if (rc_message != NULL)
+        self->iname = strdup (fty_proto_name (rc_message));
+    else
+        self->iname = strdup ("NA");
+    zsys_info ("fty-info:name      = '%s'", self-> iname);
 
     //set location (parent)
-    self->location  = s_select_rack_controller_parent (conn, self->name, "NA");
+    if (parent_message != NULL)
+        self->location  = strdup (fty_proto_name (parent_message));
+    else
+        self->location  = strdup ("NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set uuid, vendor, model from /etc/release-details.json
@@ -252,7 +176,9 @@ fty_info_new (void)
     zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
     zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
 
-    tntdb::dropCached();
+    fty_proto_destroy (&rc_message);
+    fty_proto_destroy (&parent_message);
+    
      if(si)
         delete si;
 
@@ -270,7 +196,7 @@ fty_info_destroy (fty_info_t ** self_ptr)
         zhash_destroy(&self->infos);
         zstr_free (&self->uuid);
         zstr_free (&self->hostname);
-        zstr_free (&self->name);
+        zstr_free (&self->iname);
         zstr_free (&self->model);
         zstr_free (&self->vendor);
         zstr_free (&self->serial);
@@ -304,6 +230,9 @@ fty_info_server (zsock_t *pipe, void *args)
 
     zsock_signal (pipe, 0);
     zsys_info ("fty-info: Started");
+
+    static fty_proto_t* rc_message;
+    static fty_proto_t* parent_message;
 
     while (!zsys_interrupted)
     {
@@ -377,9 +306,21 @@ fty_info_server (zsock_t *pipe, void *args)
                         continue;
                     }
                     if (fty_proto_id (bmessage) == FTY_PROTO_ASSET) {
-                        //TODO: check whether the message is relevant for us
-                        //if yes, update info structure
-                        // send the updated information
+                        //check whether the message is relevant for us
+                        const char *operation = fty_proto_operation (bmessage);
+                        if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) || streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
+                            //are we creating/updating a rack controller?
+                            const char *type = fty_proto_aux_string (bmessage, "type", "");
+                            const char *subtype = fty_proto_aux_string (bmessage, "subtype", "");
+                            if (streq (type, "device") || streq (subtype, "rack controller")) {
+                                //TODO: check if this is our rack controller
+                                rc_message = fty_proto_dup (bmessage);
+                                continue;
+                            }
+                            const char *name = fty_proto_name (bmessage);
+                            if (streq (name, fty_proto_aux_string (rc_message, "parent", "")))
+                                parent_message = fty_proto_dup (bmessage);
+                        }
                         fty_proto_destroy (&bmessage);
                         continue;
                     }
@@ -402,6 +343,7 @@ fty_info_server (zsock_t *pipe, void *args)
                         zsys_warning ("fty-info: Received unexpected command '%s'", command);
                         zmsg_t *reply = zmsg_new ();
                         zmsg_addstr(reply, "ERROR");
+                        zmsg_addstr (reply, "unexpected command");
                         mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
                         zstr_free (&command);
                         zmsg_destroy (&message);
@@ -413,7 +355,7 @@ fty_info_server (zsock_t *pipe, void *args)
                         char *zuuid = zmsg_popstr (message);
                         fty_info_t *self;
                         if (streq(command, "INFO")) {
-                            self = fty_info_new ();
+                            self = fty_info_new (rc_message, parent_message);
                         }
                         if (streq(command, "INFO-TEST")) {
                             self = fty_info_test_new ();
@@ -422,7 +364,7 @@ fty_info_server (zsock_t *pipe, void *args)
                         zmsg_addstrf (reply, "%s", zuuid);
                         zhash_insert(self->infos, INFO_UUID, self->uuid);
                         zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
-                        zhash_insert(self->infos, INFO_NAME, self->name);
+                        zhash_insert(self->infos, INFO_NAME, self->iname);
                         zhash_insert(self->infos, INFO_VENDOR, self->vendor);
                         zhash_insert(self->infos, INFO_MODEL, self->model);
                         zhash_insert(self->infos, INFO_SERIAL, self->serial);
