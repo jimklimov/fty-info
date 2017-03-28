@@ -319,7 +319,7 @@ fty_info_server (zsock_t *pipe, void *args)
             zmsg_t *message = zmsg_recv (pipe);
             if (!message)
                 break;
-             
+
             char *command = zmsg_popstr (message);
             if (!command) {
                 zmsg_destroy (&message);
@@ -374,6 +374,7 @@ fty_info_server (zsock_t *pipe, void *args)
                     fty_proto_t *bmessage = fty_proto_decode (&message);
                     if (!bmessage ) {
                         zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (client));
+                        zmsg_destroy (&message);
                         continue;
                     }
                     if (fty_proto_id (bmessage) == FTY_PROTO_ASSET) {
