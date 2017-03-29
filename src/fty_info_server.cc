@@ -317,7 +317,6 @@ fty_info_server (zsock_t *pipe, void *args)
                             if (streq (type, "device") || streq (subtype, "rack controller")) {
                                 //TODO: check if this is our rack controller
                                 rc_message = fty_proto_dup (bmessage);
-                                continue;
                             }
                             const char *name = fty_proto_name (bmessage);
                             if (streq (name, fty_proto_aux_string (rc_message, "parent", "")))
