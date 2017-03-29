@@ -317,22 +317,19 @@ fty_info_server (zsock_t *pipe, void *args)
                             if (streq (type, "device") || streq (subtype, "rack controller")) {
                                 //TODO: check if this is our rack controller
                                 rc_message = fty_proto_dup (bmessage);
-                                continue;
                             }
                             const char *name = fty_proto_name (bmessage);
                             if (streq (name, fty_proto_aux_string (rc_message, "parent", "")))
                                 // not used right now - location is internal asset name which does not changes
                                 parent_message = fty_proto_dup (bmessage);
                         }
-                        fty_proto_destroy (&bmessage);
-                        continue;
                     }
                     else {
                         zsys_warning ("Weird fty_proto msg received, id = '%d', command = '%s', subject = '%s', sender = '%s'",
                             fty_proto_id (bmessage), mlm_client_command (client), mlm_client_subject (client), mlm_client_sender (client));
-                        fty_proto_destroy (&bmessage);
-                        continue;
                     }
+                    fty_proto_destroy (&bmessage);
+                    continue;
                 }
                 else {
                     char *command = zmsg_popstr (message);
@@ -417,7 +414,8 @@ fty_info_server_test (bool verbose)
     if (verbose)
         zstr_send (info_server, "VERBOSE");
     zstr_sendx (info_server, "CONNECT", endpoint, NULL);
-    zclock_sleep (1000);
+    zstr_sendx (info_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
+	zclock_sleep (1000);
 
     // Test #1: request INFO-TEST
     {
@@ -517,7 +515,9 @@ fty_info_server_test (bool verbose)
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
         zhash_autofree (ext);
-        zhash_update (aux, "parent", (void *) location);
+        zhash_update (aux, "type", (void *) "device");
+	zhash_update (aux, "subtype", (void *) "rack controller");
+	zhash_update (aux, "parent", (void *) location);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
         zmsg_t *msg = fty_proto_encode_asset (
@@ -526,7 +526,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -552,6 +552,10 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
+		if (streq (key, "name"))
+			assert (streq (value, TST_NAME));
+		if (streq (key, "location"))
+			assert (streq (value, TST_LOCATION));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -563,11 +567,14 @@ fty_info_server_test (bool verbose)
     }
     //TEST #4: process asset message - UPDATE RC (change location)
     {
+        zsys_debug ("fty-info-test:Test #4");
         zhash_t* aux = zhash_new ();
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
         zhash_autofree (ext);
         const char *location = TST_LOCATION2;
+        zhash_update (aux, "type", (void *) "device");
+	zhash_update (aux, "subtype", (void *) "rack controller");
         zhash_update (aux, "parent", (void *) location);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
@@ -603,6 +610,10 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
+		if (streq (key, "name"))
+			assert (streq (value, TST_NAME));
+		if (streq (key, "location"))
+			assert (streq (value, TST_LOCATION2));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -610,7 +621,7 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #3: OK");
+        zsys_info ("fty-info-test:Test #4: OK");
     }
     mlm_client_destroy (&asset_generator);
     //  @end
