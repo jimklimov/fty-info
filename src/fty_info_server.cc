@@ -48,6 +48,9 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 #include <cxxtools/jsondeserializer.h>
 #include <istream>
 #include <fstream>
+#include <set>
+#include <map>
+#include <ifaddrs.h>
 
 #include "fty_info_classes.h"
 
@@ -65,6 +68,46 @@ struct _fty_info_t {
     char *rest_port;
 };
 
+static std::map<std::string,std::set<std::string>>
+s_local_addresses()
+{
+    struct ifaddrs *interfaces, *iface;
+    char host[NI_MAXHOST];
+    std::map<std::string,std::set<std::string>> result;
+
+    if (getifaddrs (&interfaces) == -1) {
+        return result;
+    }
+    iface = interfaces;
+    for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+        if (iface->ifa_addr == NULL) continue;
+        int family = iface->ifa_addr->sa_family;
+        if (family == AF_INET || family == AF_INET6) {
+            if (
+                    getnameinfo(iface->ifa_addr,
+                        (family == AF_INET) ? sizeof(struct sockaddr_in) :
+                        sizeof(struct sockaddr_in6),
+                        host, NI_MAXHOST,
+                        NULL, 0, NI_NUMERICHOST) == 0
+               ) {
+                // sometimes IPv6 addres looks like ::2342%IfaceName
+                char *p = strchr (host, '%');
+                if (p) *p = 0;
+
+                auto it = result.find (iface->ifa_name);
+                if (it == result.end()) {
+                    std::set<std::string> aSet;
+                    aSet.insert (host);
+                    result [iface->ifa_name] = aSet;
+                } else {
+                    result [iface->ifa_name].insert (host);
+                }
+            }
+        }
+    }
+    freeifaddrs (interfaces);
+    return result;
+}
 
 static cxxtools::SerializationInfo*
 s_load_release_details()
@@ -177,10 +220,7 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
     zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
     zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
 
-    fty_proto_destroy (&rc_message);
-    fty_proto_destroy (&parent_message);
-    
-     if(si)
+    if(si)
         delete si;
 
     return self;
@@ -315,13 +355,64 @@ fty_info_server (zsock_t *pipe, void *args)
                             const char *type = fty_proto_aux_string (bmessage, "type", "");
                             const char *subtype = fty_proto_aux_string (bmessage, "subtype", "");
                             if (streq (type, "device") || streq (subtype, "rack controller")) {
-                                //TODO: check if this is our rack controller
-                                rc_message = fty_proto_dup (bmessage);
+                                //check if this is our rack controller - is any IP address of this asset the same as one of the local addresses?
+                                auto ifaces = s_local_addresses ();
+                                zhash_t *ext = fty_proto_ext (bmessage);
+
+                                int ipv6_index = 1;
+                                bool found = false;
+                                while (true) {
+                                    void *ip = zhash_lookup (ext, ("ipv6." + std::to_string (ipv6_index)).c_str ());
+                                    ipv6_index++;
+                                    if (ip != NULL) {
+                                        for (auto &iface : ifaces) {
+                                            if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                                                found = true;
+                                                fty_proto_destroy (&rc_message);
+                                                rc_message = fty_proto_dup (bmessage);
+                                                //try another network interface only if match was not found
+                                                break;
+                                            }
+                                        }
+                                        // try another address only if match was not found
+                                        if (found)
+                                            break;
+                                    }
+                                    // no other IPv6 address on the investigated asset
+                                    else
+                                        break;
+                                }
+
+                                found = false;
+                                int ipv4_index = 1;
+                                while (true) {
+                                    void *ip = zhash_lookup (ext, ("ip." + std::to_string (ipv4_index)).c_str ());
+                                    ipv4_index++;
+                                    if (ip != NULL) {
+                                        for (auto &iface : ifaces) {
+                                            if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                                                found = true;
+                                                fty_proto_destroy (&rc_message);
+                                                rc_message = fty_proto_dup (bmessage);
+                                                //try another network interface only if match was not found
+                                                break;
+                                            }
+                                        }
+                                        // try another address only if match was not found
+                                        if (found)
+                                            break;
+                                    }
+                                    // no other IPv4 address on the investigated asset
+                                    else
+                                        break;
+                                }
                             }
                             const char *name = fty_proto_name (bmessage);
-                            if (streq (name, fty_proto_aux_string (rc_message, "parent", "")))
+                            if (rc_message == NULL || streq (name, fty_proto_aux_string (rc_message, "parent", ""))) {
                                 // not used right now - location is internal asset name which does not changes
+                                fty_proto_destroy (&parent_message);
                                 parent_message = fty_proto_dup (bmessage);
+                            }
                         }
                     }
                     else {
@@ -385,6 +476,9 @@ fty_info_server (zsock_t *pipe, void *args)
                 }
             }
     }
+    fty_proto_destroy (&rc_message);
+    fty_proto_destroy (&parent_message);
+
     zpoller_destroy (&poller);
     mlm_client_destroy (&client);
 }
@@ -530,9 +624,9 @@ fty_info_server_test (bool verbose)
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
-        
+
         zclock_sleep (6000);
-        
+
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
         zuuid_t *zuuid = zuuid_new ();
@@ -622,6 +716,66 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #4: OK");
+    }
+    //TEST #5: process asset message - do not process CREATE RC with IP address
+    // which does not belong to us
+    {
+        zsys_debug ("fty-info-test:Test #5");
+        zhash_t* aux = zhash_new ();
+        zhash_t *ext = zhash_new ();
+        zhash_autofree (aux);
+        zhash_autofree (ext);
+        const char *location = TST_LOCATION;
+        zhash_update (aux, "type", (void *) "device");
+        zhash_update (aux, "subtype", (void *) "rack controller");
+        zhash_update (aux, "parent", (void *) location);
+        // use invalid IP address to make sure we don't have it
+        zhash_update (ext, "ip.1", (void *) "300.3000.300.300");
+
+        zmsg_t *msg = fty_proto_encode_asset (
+                aux,
+                TST_NAME,
+                FTY_PROTO_ASSET_OP_CREATE,
+                ext);
+
+        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        assert (rv == 0);
+        zhash_destroy (&aux);
+        zhash_destroy (&ext);
+
+        zclock_sleep (6000);
+
+        zmsg_t *request = zmsg_new ();
+        zmsg_addstr (request, "INFO");
+        zuuid_t *zuuid = zuuid_new ();
+        zmsg_addstrf (request, "%s", zuuid_str_canonical (zuuid));
+        mlm_client_sendto (client, "fty-info", "INFO", NULL, 1000, &request);
+
+        zmsg_t *recv = mlm_client_recv (client);
+
+        assert (zmsg_size (recv) == 2);
+        char *zuuid_reply = zmsg_popstr (recv);
+        assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+
+        zframe_t *frame_infos = zmsg_next (recv);
+        zhash_t *infos = zhash_unpack(frame_infos);
+
+        char *value = (char *) zhash_first (infos);   // first value
+        while ( value != NULL )  {
+            char *key = (char *) zhash_cursor (infos);   // key of this value
+            zsys_debug ("fty-info-test: %s = %s",key,value);
+		if (streq (key, "name"))
+			assert (streq (value, TST_NAME));
+		if (streq (key, "location"))
+			assert (streq (value, TST_LOCATION2));
+            value     = (char *) zhash_next (infos);   // next value
+        }
+        zstr_free (&zuuid_reply);
+        zhash_destroy(&infos);
+        zmsg_destroy (&recv);
+        zmsg_destroy (&request);
+        zuuid_destroy (&zuuid);
+        zsys_info ("fty-info-test:Test #5: OK");
     }
     mlm_client_destroy (&asset_generator);
     //  @end
