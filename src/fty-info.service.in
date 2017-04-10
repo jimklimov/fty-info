@@ -11,6 +11,7 @@ PartOf=bios.target
 [Service]
 Type=simple
 User=bios
+Restart=always
 EnvironmentFile=-@prefix@/share/bios/etc/default/bios
 EnvironmentFile=-@prefix@/share/bios/etc/default/bios__%n.conf
 EnvironmentFile=-@prefix@/share/bios/etc/default/fty
@@ -22,7 +23,6 @@ EnvironmentFile=-@sysconfdir@/default/fty__%n.conf
 Environment="prefix=@prefix@"
 EnvironmentFile=-@sysconfdir@/default/bios-db-ro
 ExecStart=@prefix@/bin/fty-info @sysconfdir@/@PACKAGE@/fty-info.cfg
-Restart=always
 
 [Install]
 WantedBy=bios.target
