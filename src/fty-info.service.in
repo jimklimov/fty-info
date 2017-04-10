@@ -20,7 +20,7 @@ EnvironmentFile=-@sysconfdir@/default/bios__%n.conf
 EnvironmentFile=-@sysconfdir@/default/fty
 EnvironmentFile=-@sysconfdir@/default/fty__%n.conf
 Environment="prefix=@prefix@"
-EnvironmentFile=-/etc/default/bios-db-ro
+EnvironmentFile=-@sysconfdir@/default/bios-db-ro
 ExecStart=@prefix@/bin/fty-info @sysconfdir@/@PACKAGE@/fty-info.cfg
 Restart=always
 
