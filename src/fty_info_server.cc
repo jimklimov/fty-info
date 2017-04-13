@@ -68,6 +68,52 @@ struct _fty_info_t {
     char *rest_port;
 };
 
+struct _fty_info_server_t {
+    //  Declare class properties here
+    char* name;
+    mlm_client_t *client;
+    bool verbose;
+    fty_proto_t* rc_message;
+    fty_proto_t* parent_message;
+};
+
+//  --------------------------------------------------------------------------
+//  Create a new mango_profpga_config_server
+
+fty_info_server_t  *
+info_server_new (char *name)
+{
+    fty_info_server_t  *self = (fty_info_server_t  *) zmalloc (sizeof (fty_info_server_t ));
+    assert (self);
+    //  Initialize class properties here
+    self->name=strdup(name);
+    self->client = mlm_client_new ();
+    self->verbose=false;
+    return self;
+}
+//  --------------------------------------------------------------------------
+//  Destroy the mango_profpga_config_server
+
+void
+info_server_destroy (fty_info_server_t  **self_p)
+{
+    assert (self_p);
+    if (*self_p) {
+        fty_info_server_t  *self = *self_p;
+        //  Free class properties here
+        mlm_client_destroy (&self->client);
+        if(self->name)
+            zstr_free(&self->name);
+        if(self->rc_message)
+            fty_proto_destroy (&self->rc_message);
+        if(self->parent_message)
+            fty_proto_destroy (&self->parent_message);
+        //  Free object itself
+        free (self);
+        *self_p = NULL;  
+    }
+}
+
 static std::map<std::string,std::set<std::string>>
 s_local_addresses()
 {
@@ -251,7 +297,218 @@ fty_info_destroy (fty_info_t ** self_ptr)
     }
 
 }
+//  --------------------------------------------------------------------------
+//  process pipe message 
+//  return true means continue, false means TERM
+bool static
+s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
+{
+    if (!message)
+        return true;
+    char *command = zmsg_popstr (message);
+    if (!command) {
+        zmsg_destroy (&message);
+        zsys_warning ("Empty command.");
+        return true;
+    }
+    if (streq(command, "$TERM")) {
+        zsys_info ("Got $TERM");
+        zmsg_destroy (&message);
+        zstr_free (&command);
+        return false;
+    }
+    else
+    if (streq(command, "CONNECT")) {
+        char *endpoint = zmsg_popstr (message);
 
+        if (endpoint) {
+            zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, self->name);
+            int rv = mlm_client_connect (self->client, endpoint, 1000, self->name);
+            if (rv == -1)
+                zsys_error("mlm_client_connect failed\n");
+        }
+        zstr_free (&endpoint);
+    }
+    else
+    if (streq (command, "VERBOSE")) {
+        self->verbose = true;
+        zsys_debug ("fty-info: VERBOSE=true");
+    }
+    else
+    if (streq (command, "CONSUMER")) {
+        char* stream = zmsg_popstr (message);
+        char* pattern = zmsg_popstr (message);
+        int rv = mlm_client_set_consumer (self->client, stream, pattern);
+        if (rv == -1)
+            zsys_error ("%s: can't set consumer on stream '%s', '%s'", 
+                    self->name, stream, pattern);
+        zstr_free (&pattern);
+        zstr_free (&stream);
+    }
+    else
+        zsys_error ("fty-info: Unknown actor command: %s.\n", command);
+
+    zstr_free (&command);
+    zmsg_destroy (&message);
+    return true;
+    
+}
+
+//  --------------------------------------------------------------------------
+//  process message from FTY_PROTO_ASSET stream 
+void static
+s_handle_stream(fty_info_server_t* self,zmsg_t *message)
+{
+    if (!is_fty_proto (message)){
+        zmsg_destroy (&message);
+        return;
+    }
+    fty_proto_t *bmessage = fty_proto_decode (&message);
+    if (!bmessage ) {
+        zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
+        zmsg_destroy (&message);
+        return;
+    }
+    if (fty_proto_id (bmessage) != FTY_PROTO_ASSET) {
+        fty_proto_destroy (&bmessage);
+        zmsg_destroy (&message);
+        return;
+        
+    }
+    //check whether the message is relevant for us
+    const char *operation = fty_proto_operation (bmessage);
+    if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) || 
+        streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
+        //are we creating/updating a rack controller?
+        const char *type = fty_proto_aux_string (bmessage, "type", "");
+        const char *subtype = fty_proto_aux_string (bmessage, "subtype", "");
+        if (streq (type, "device") || streq (subtype, "rackcontroller")) {
+            //check if this is our rack controller - is any IP address
+            //of this asset the same as one of the local addresses?
+            auto ifaces = s_local_addresses ();
+            zhash_t *ext = fty_proto_ext (bmessage);
+
+            int ipv6_index = 1;
+            bool found = false;
+            while (true) {
+                void *ip = zhash_lookup (ext, ("ipv6." + std::to_string (ipv6_index)).c_str ());
+                ipv6_index++;
+                if (ip != NULL) {
+                    for (auto &iface : ifaces) {
+                        if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                            found = true;
+                            if(self->rc_message)
+                                fty_proto_destroy (&(self->rc_message));
+                            self->rc_message = fty_proto_dup (bmessage);
+                            //try another network interface only if match was not found
+                            break;
+                        }
+                    }
+                    // try another address only if match was not found
+                    if (found)
+                        break;
+                }
+                // no other IPv6 address on the investigated asset
+                else
+                    break;
+            }
+
+            found = false;
+            int ipv4_index = 1;
+            while (true) {
+                void *ip = zhash_lookup (ext, ("ip." + std::to_string (ipv4_index)).c_str ());
+                ipv4_index++;
+                if (ip != NULL) {
+                    for (auto &iface : ifaces) {
+                        if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                            found = true;
+                            if(self->rc_message)
+                                fty_proto_destroy (&(self->rc_message));
+                            self->rc_message = fty_proto_dup (bmessage);
+                            //try another network interface only if match was not found
+                            break;
+                        }
+                    }
+                    // try another address only if match was not found
+                    if (found)
+                        break;
+                }
+                // no other IPv4 address on the investigated asset
+                else
+                    break;
+            }
+        }
+        const char *name = fty_proto_name (bmessage);
+        if (self->rc_message == NULL || streq (name, fty_proto_aux_string (self->rc_message, "parent", ""))) {
+            // not used right now - location is internal asset name which does not changes
+            if(self->parent_message)
+                fty_proto_destroy (&(self->parent_message));
+            self->parent_message = fty_proto_dup (bmessage);
+        }
+    }
+    
+    fty_proto_destroy (&bmessage);
+    zmsg_destroy (&message);
+    
+}
+
+//  --------------------------------------------------------------------------
+//  process message from MAILBOX DELIVER INFO INFO/INFO-TEST
+void static
+s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
+{
+    char *command = zmsg_popstr (message);
+    if (!command) {
+        zmsg_destroy (&message);
+        zsys_warning ("Empty subject.");
+        return;
+    }
+    //we assume all request command are MAILBOX DELIVER, and subject="info"
+    if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
+        zsys_warning ("fty-info: Received unexpected command '%s'", command);
+        zmsg_t *reply = zmsg_new ();
+        zmsg_addstr(reply, "ERROR");
+        zmsg_addstr (reply, "unexpected command");
+        mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
+        zstr_free (&command);
+        zmsg_destroy (&message);
+        return;
+    }
+    else {
+        zsys_debug ("fty-info:do '%s'", command);
+        zmsg_t *reply = zmsg_new ();
+        char *zuuid = zmsg_popstr (message);
+        fty_info_t *info;
+        if (streq(command, "INFO")) {
+            info = fty_info_new (self->rc_message, self->parent_message);
+        }
+        if (streq(command, "INFO-TEST")) {
+            info = fty_info_test_new ();
+        }
+        //prepare replied msg content
+        zmsg_addstrf (reply, "%s", zuuid);
+        zhash_insert(info->infos, INFO_UUID, info->uuid);
+        zhash_insert(info->infos, INFO_HOSTNAME, info->hostname);
+        zhash_insert(info->infos, INFO_NAME, info->iname);
+        zhash_insert(info->infos, INFO_VENDOR, info->vendor);
+        zhash_insert(info->infos, INFO_MODEL, info->model);
+        zhash_insert(info->infos, INFO_SERIAL, info->serial);
+        zhash_insert(info->infos, INFO_LOCATION, info->location);
+        zhash_insert(info->infos, INFO_VERSION, info->version);
+        zhash_insert(info->infos, INFO_REST_PATH, info->rest_path);
+        zhash_insert(info->infos, INFO_REST_PORT, info->rest_port);
+
+        zframe_t * frame_infos = zhash_pack(info->infos);
+        zmsg_append (reply, &frame_infos);
+        mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
+        zframe_destroy(&frame_infos);
+        zstr_free (&zuuid);
+        fty_info_destroy (&info);
+    }
+    zstr_free (&command);
+    zmsg_destroy (&message);
+
+}
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
@@ -263,17 +520,13 @@ fty_info_server (zsock_t *pipe, void *args)
         zsys_error ("Address for fty-info actor is NULL");
         return;
     }
-    bool verbose = false;
 
-    mlm_client_t *client = mlm_client_new ();
-    zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (client), NULL);
+    fty_info_server_t *self = info_server_new (name);
+    zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (self->client), NULL);
     assert (poller);
 
     zsock_signal (pipe, 0);
     zsys_info ("fty-info: Started");
-
-    static fty_proto_t* rc_message;
-    static fty_proto_t* parent_message;
 
     while (!zsys_interrupted)
     {
@@ -284,203 +537,30 @@ fty_info_server (zsock_t *pipe, void *args)
             }
         }
         if (which == pipe) {
-            if (verbose)
+            if (self->verbose)
                 zsys_debug ("which == pipe");
-            zmsg_t *message = zmsg_recv (pipe);
-            if (!message)
-                break;
-
-            char *command = zmsg_popstr (message);
-            if (!command) {
-                zmsg_destroy (&message);
-                zsys_warning ("Empty command.");
-                continue;
-            }
-            if (streq(command, "$TERM")) {
-                zsys_info ("Got $TERM");
-                zmsg_destroy (&message);
-                zstr_free (&command);
-                break;
-            }
-            else
-                if (streq(command, "CONNECT")) {
-                    char *endpoint = zmsg_popstr (message);
-
-                    if (endpoint) {
-                        zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, name);
-                        int rv = mlm_client_connect (client, endpoint, 1000, name);
-                        if (rv == -1)
-                            zsys_error("mlm_client_connect failed\n");
-                    }
-                    zstr_free (&endpoint);
-                }
-                else
-                    if (streq (command, "VERBOSE")) {
-                        verbose = true;
-                        zsys_debug ("fty-info: VERBOSE=true");
-                    }
-                    else
-                        if (streq (command, "CONSUMER")) {
-                            char* stream = zmsg_popstr (message);
-                            char* pattern = zmsg_popstr (message);
-                            int rv = mlm_client_set_consumer (client, stream, pattern);
-                            if (rv == -1)
-                                zsys_error ("%s: can't set consumer on stream '%s', '%s'", name, stream, pattern);
-                            zstr_free (&pattern);
-                            zstr_free (&stream);
-                        }
-                        else {
-                            zsys_error ("fty-info: Unknown actor command: %s.\n", command);
-                        }
-            zstr_free (&command);
-            zmsg_destroy (&message);
+            if(!s_handle_pipe(self,zmsg_recv (pipe)))
+                break;//TERM
+            else continue;
         }
         else
-            if (which == mlm_client_msgpipe (client)) {
-                zmsg_t *message = mlm_client_recv (client);
-                if (!message)
-                    continue;
-                if (is_fty_proto (message)) {
-                    fty_proto_t *bmessage = fty_proto_decode (&message);
-                    if (!bmessage ) {
-                        zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (client));
-                        zmsg_destroy (&message);
-                        continue;
-                    }
-                    if (fty_proto_id (bmessage) == FTY_PROTO_ASSET) {
-                        //check whether the message is relevant for us
-                        const char *operation = fty_proto_operation (bmessage);
-                        if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) || streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
-                            //are we creating/updating a rack controller?
-                            const char *type = fty_proto_aux_string (bmessage, "type", "");
-                            const char *subtype = fty_proto_aux_string (bmessage, "subtype", "");
-                            if (streq (type, "device") || streq (subtype, "rack controller")) {
-                                //check if this is our rack controller - is any IP address of this asset the same as one of the local addresses?
-                                auto ifaces = s_local_addresses ();
-                                zhash_t *ext = fty_proto_ext (bmessage);
-
-                                int ipv6_index = 1;
-                                bool found = false;
-                                while (true) {
-                                    void *ip = zhash_lookup (ext, ("ipv6." + std::to_string (ipv6_index)).c_str ());
-                                    ipv6_index++;
-                                    if (ip != NULL) {
-                                        for (auto &iface : ifaces) {
-                                            if (iface.second.find ((char *)ip) != iface.second.end ()) {
-                                                found = true;
-                                                fty_proto_destroy (&rc_message);
-                                                rc_message = fty_proto_dup (bmessage);
-                                                //try another network interface only if match was not found
-                                                break;
-                                            }
-                                        }
-                                        // try another address only if match was not found
-                                        if (found)
-                                            break;
-                                    }
-                                    // no other IPv6 address on the investigated asset
-                                    else
-                                        break;
-                                }
-
-                                found = false;
-                                int ipv4_index = 1;
-                                while (true) {
-                                    void *ip = zhash_lookup (ext, ("ip." + std::to_string (ipv4_index)).c_str ());
-                                    ipv4_index++;
-                                    if (ip != NULL) {
-                                        for (auto &iface : ifaces) {
-                                            if (iface.second.find ((char *)ip) != iface.second.end ()) {
-                                                found = true;
-                                                fty_proto_destroy (&rc_message);
-                                                rc_message = fty_proto_dup (bmessage);
-                                                //try another network interface only if match was not found
-                                                break;
-                                            }
-                                        }
-                                        // try another address only if match was not found
-                                        if (found)
-                                            break;
-                                    }
-                                    // no other IPv4 address on the investigated asset
-                                    else
-                                        break;
-                                }
-                            }
-                            const char *name = fty_proto_name (bmessage);
-                            if (rc_message == NULL || streq (name, fty_proto_aux_string (rc_message, "parent", ""))) {
-                                // not used right now - location is internal asset name which does not changes
-                                fty_proto_destroy (&parent_message);
-                                parent_message = fty_proto_dup (bmessage);
-                            }
-                        }
-                    }
-                    else {
-                        zsys_warning ("Weird fty_proto msg received, id = '%d', command = '%s', subject = '%s', sender = '%s'",
-                            fty_proto_id (bmessage), mlm_client_command (client), mlm_client_subject (client), mlm_client_sender (client));
-                    }
-                    fty_proto_destroy (&bmessage);
-                    continue;
-                }
-                else {
-                    char *command = zmsg_popstr (message);
-                    if (!command) {
-                        zmsg_destroy (&message);
-                        zsys_warning ("Empty subject.");
-                        continue;
-                    }
-                    //we assume all request command are MAILBOX DELIVER, and subject="info"
-                    if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
-                        zsys_warning ("fty-info: Received unexpected command '%s'", command);
-                        zmsg_t *reply = zmsg_new ();
-                        zmsg_addstr(reply, "ERROR");
-                        zmsg_addstr (reply, "unexpected command");
-                        mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
-                        zstr_free (&command);
-                        zmsg_destroy (&message);
-                        continue;
-                    }
-                    else {
-                        zsys_debug ("fty-info:do '%s'", command);
-                        zmsg_t *reply = zmsg_new ();
-                        char *zuuid = zmsg_popstr (message);
-                        fty_info_t *self;
-                        if (streq(command, "INFO")) {
-                            self = fty_info_new (rc_message, parent_message);
-                        }
-                        if (streq(command, "INFO-TEST")) {
-                            self = fty_info_test_new ();
-                        }
-                        //prepare replied msg content
-                        zmsg_addstrf (reply, "%s", zuuid);
-                        zhash_insert(self->infos, INFO_UUID, self->uuid);
-                        zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
-                        zhash_insert(self->infos, INFO_NAME, self->iname);
-                        zhash_insert(self->infos, INFO_VENDOR, self->vendor);
-                        zhash_insert(self->infos, INFO_MODEL, self->model);
-                        zhash_insert(self->infos, INFO_SERIAL, self->serial);
-                        zhash_insert(self->infos, INFO_LOCATION, self->location);
-                        zhash_insert(self->infos, INFO_VERSION, self->version);
-                        zhash_insert(self->infos, INFO_REST_PATH, self->rest_path);
-                        zhash_insert(self->infos, INFO_REST_PORT, self->rest_port);
-
-                        zframe_t * frame_infos = zhash_pack(self->infos);
-                        zmsg_append (reply, &frame_infos);
-                        mlm_client_sendto (client, mlm_client_sender (client), "info", NULL, 1000, &reply);
-                        zframe_destroy(&frame_infos);
-                        zstr_free (&zuuid);
-                        fty_info_destroy (&self);
-                    }
-                    zstr_free (&command);
-                    zmsg_destroy (&message);
-                }
+        if (which == mlm_client_msgpipe (self->client)) {
+            zmsg_t *message = mlm_client_recv (self->client);
+            if (!message)
+                continue;
+            const char *command = mlm_client_command (self->client);
+            if (streq (command, "STREAM DELIVER")) {
+                s_handle_stream (self, message);
             }
+            else
+            if (streq (command, "MAILBOX DELIVER")) {
+                s_handle_mailbox (self, message);
+            }
+        }
     }
-    fty_proto_destroy (&rc_message);
-    fty_proto_destroy (&parent_message);
 
     zpoller_destroy (&poller);
-    mlm_client_destroy (&client);
+    info_server_destroy(&self);
 }
 
 //  --------------------------------------------------------------------------
@@ -610,7 +690,7 @@ fty_info_server_test (bool verbose)
         zhash_autofree (aux);
         zhash_autofree (ext);
         zhash_update (aux, "type", (void *) "device");
-	zhash_update (aux, "subtype", (void *) "rack controller");
+	zhash_update (aux, "subtype", (void *) "rackcontroller");
 	zhash_update (aux, "parent", (void *) location);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
@@ -620,12 +700,12 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
 
-        zclock_sleep (6000);
+        zclock_sleep (1000);
 
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
@@ -668,7 +748,7 @@ fty_info_server_test (bool verbose)
         zhash_autofree (ext);
         const char *location = TST_LOCATION2;
         zhash_update (aux, "type", (void *) "device");
-	zhash_update (aux, "subtype", (void *) "rack controller");
+	zhash_update (aux, "subtype", (void *) "rackcontroller");
         zhash_update (aux, "parent", (void *) location);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
@@ -678,12 +758,12 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_UPDATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
         
-        zclock_sleep (6000);
+        zclock_sleep (1000);
         
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
@@ -743,7 +823,7 @@ fty_info_server_test (bool verbose)
         zhash_destroy (&aux);
         zhash_destroy (&ext);
 
-        zclock_sleep (6000);
+        zclock_sleep (1000);
 
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
