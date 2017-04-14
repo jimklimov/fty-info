@@ -58,6 +58,7 @@ int main (int argc, char *argv [])
     
     zstr_sendx (server, "CONNECT", "ipc://@/malamute", FTY_INFO_AGENT, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
+    zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
 
     // src/malamute.c, under MPL license
     while (true) {

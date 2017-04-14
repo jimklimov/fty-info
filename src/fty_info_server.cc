@@ -71,8 +71,12 @@ struct _fty_info_t {
 struct _fty_info_server_t {
     //  Declare class properties here
     char* name;
+    char* endpoint;
     mlm_client_t *client;
+    mlm_client_t *announce_client;
     bool verbose;
+    bool first_announce;
+    bool announce_test;
     fty_proto_t* rc_message;
     fty_proto_t* parent_message;
 };
@@ -88,7 +92,10 @@ info_server_new (char *name)
     //  Initialize class properties here
     self->name=strdup(name);
     self->client = mlm_client_new ();
+    self->announce_client = mlm_client_new ();
     self->verbose=false;
+    self->first_announce=true;
+    self->announce_test=false;
     return self;
 }
 //  --------------------------------------------------------------------------
@@ -102,8 +109,11 @@ info_server_destroy (fty_info_server_t  **self_p)
         fty_info_server_t  *self = *self_p;
         //  Free class properties here
         mlm_client_destroy (&self->client);
+        mlm_client_destroy (&self->announce_client);
         if(self->name)
             zstr_free(&self->name);
+        if(self->endpoint)
+            zstr_free(&self->endpoint);
         if(self->rc_message)
             fty_proto_destroy (&self->rc_message);
         if(self->parent_message)
@@ -198,7 +208,7 @@ fty_info_test_new (void)
     self->infos     = zhash_new();
     self->uuid      = strdup (TST_UUID);
     self->hostname  = strdup (TST_HOSTNAME);
-    self->iname      = strdup (TST_NAME);
+    self->iname     = strdup (TST_NAME);
     self->model     = strdup (TST_MODEL);
     self->vendor    = strdup (TST_VENDOR);
     self->serial    = strdup (TST_SERIAL);
@@ -297,6 +307,76 @@ fty_info_destroy (fty_info_t ** self_ptr)
     }
 
 }
+
+//  --------------------------------------------------------------------------
+//  publish announcement on STREAM ANNOUNCE/ANNOUNCE-TEST
+//  subject : CREATE/UPDATE
+//  body :
+//    - name    IPC
+//    - type    _https._tcp.
+//    - subtype _powerservice._sub._https._tcp.
+//    - port    443
+//    - hashtable : TXT name, TXT value
+//          uuid
+//          name
+//          vendor
+//          serial
+//          model
+//          location
+//          version
+//          rest_path
+//          rest_port
+static void
+s_publish_announce(fty_info_server_t  * self)
+{
+
+    if(!mlm_client_connected(self->announce_client))
+        return;
+    fty_info_t *info;
+    if (self->announce_test) {
+        info = fty_info_new (self->rc_message, self->parent_message);
+    }
+    if (self->announce_test) {
+        info = fty_info_test_new ();
+    }
+    
+    //prepare  msg content
+    zmsg_t *msg=zmsg_new();
+    zmsg_addstr (msg, "IPC"); //TODO postfix with(UUID))
+    zmsg_addstr (msg, "_https._tcp.");
+    zmsg_addstr (msg, "_powerservice._sub._https._tcp.");
+    zmsg_addstr (msg, "443");
+    zhash_insert(info->infos, INFO_UUID, info->uuid);
+    zhash_insert(info->infos, INFO_HOSTNAME, info->hostname);
+    zhash_insert(info->infos, INFO_NAME, info->iname);
+    zhash_insert(info->infos, INFO_VENDOR, info->vendor);
+    zhash_insert(info->infos, INFO_MODEL, info->model);
+    zhash_insert(info->infos, INFO_SERIAL, info->serial);
+    zhash_insert(info->infos, INFO_LOCATION, info->location);
+    zhash_insert(info->infos, INFO_VERSION, info->version);
+    zhash_insert(info->infos, INFO_REST_PATH, info->rest_path);
+    zhash_insert(info->infos, INFO_REST_PORT, info->rest_port);
+
+    zframe_t * frame_infos = zhash_pack(info->infos);
+    zmsg_append (msg, &frame_infos);
+    if (self->first_announce){
+        if(mlm_client_send (self->announce_client,"CREATE",&msg )!=-1){
+            zsys_info("publish CREATE msg on ANNOUNCE STREAM");
+            self->first_announce=false;
+        }
+        else
+            zsys_error("cant publish CREATE msg on ANNOUNCE STREAM");
+    }else{
+        if(mlm_client_send (self->announce_client,"UPDATE",&msg )!=-1)
+            zsys_info("publish UPDATE msg on ANNOUNCE STREAM");
+        else
+            zsys_error("cant publish UPDATE msg on ANNOUNCE STREAM");
+    }
+        
+    zframe_destroy(&frame_infos);
+    fty_info_destroy (&info);
+    
+}
 //  --------------------------------------------------------------------------
 //  process pipe message 
 //  return true means continue, false means TERM
@@ -322,10 +402,12 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char *endpoint = zmsg_popstr (message);
 
         if (endpoint) {
-            zsys_debug ("fty-info: CONNECT: %s/%s", endpoint, self->name);
-            int rv = mlm_client_connect (self->client, endpoint, 1000, self->name);
+            self->endpoint = strdup(endpoint);
+            zsys_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
+            int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
                 zsys_error("mlm_client_connect failed\n");
+            
         }
         zstr_free (&endpoint);
     }
@@ -343,6 +425,22 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             zsys_error ("%s: can't set consumer on stream '%s', '%s'", 
                     self->name, stream, pattern);
         zstr_free (&pattern);
+        zstr_free (&stream);
+    }
+    else
+    if (streq (command, "PRODUCER")) {
+        char* stream = zmsg_popstr (message);
+        self->announce_test=streq(stream,"ANNOUNCE-TEST");
+        int rv = mlm_client_connect (self->announce_client, self->endpoint, 1000, "fty_info_announce");
+        if (rv == -1)
+                zsys_error("fty_info_announce : mlm_client_connect failed\n");
+        rv = mlm_client_set_producer (self->announce_client, stream);
+        if (rv == -1)
+            zsys_error ("%s: can't set producer on stream '%s'", 
+                    self->name, stream);
+        else
+            //do the first announce
+            s_publish_announce(self);
         zstr_free (&stream);
     }
     else
@@ -377,6 +475,7 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
     }
     //check whether the message is relevant for us
     const char *operation = fty_proto_operation (bmessage);
+    bool found = false;
     if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) || 
         streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
         //are we creating/updating a rack controller?
@@ -389,7 +488,7 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
             zhash_t *ext = fty_proto_ext (bmessage);
 
             int ipv6_index = 1;
-            bool found = false;
+            found = false;
             while (true) {
                 void *ip = zhash_lookup (ext, ("ipv6." + std::to_string (ipv6_index)).c_str ());
                 ipv6_index++;
@@ -444,7 +543,10 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
             if(self->parent_message)
                 fty_proto_destroy (&(self->parent_message));
             self->parent_message = fty_proto_dup (bmessage);
+            found=true;
         }
+        if(found)
+            s_publish_announce(self);
     }
     
     fty_proto_destroy (&bmessage);
@@ -856,6 +958,67 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
         zsys_info ("fty-info-test:Test #5: OK");
+    }
+    // TEST #6 : test STREAM announce
+    {
+        zsys_debug ("fty-info-test:Test #6");
+        int rv = mlm_client_set_consumer (client, "ANNOUNCE-TEST", ".*");
+        assert(rv>=0);
+        zstr_sendx (info_server, "PRODUCER", "ANNOUNCE-TEST", NULL);
+        zmsg_t *recv = mlm_client_recv (client);
+        assert(recv);
+        const char *command = mlm_client_command (client);
+        assert(streq (command, "STREAM DELIVER"));
+        char *srv_name = zmsg_popstr (recv);
+        assert (srv_name && streq (srv_name,"IPC"));
+        zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
+        char *srv_type = zmsg_popstr (recv);
+        assert (srv_type && streq (srv_type,"_https._tcp."));
+        zsys_debug ("fty-info-test: srv type = '%s'", srv_type);
+        char *srv_stype = zmsg_popstr (recv);
+        assert (srv_stype && streq (srv_stype,"_powerservice._sub._https._tcp."));
+        zsys_debug ("fty-info-test: srv stype = '%s'", srv_stype);
+        char *srv_port = zmsg_popstr (recv);
+        assert (srv_port && streq (srv_port,"443"));
+        zsys_debug ("fty-info-test: srv stype = '%s'", srv_port);
+   
+        zframe_t *frame_infos = zmsg_next (recv);
+        zhash_t *infos = zhash_unpack(frame_infos);
+
+        char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
+        assert(uuid && streq (uuid,TST_UUID));
+        zsys_debug ("fty-info-test: uuid = '%s'", uuid);
+        char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
+        assert(hostname && streq (hostname, TST_HOSTNAME));
+        zsys_debug ("fty-info-test: hostname = '%s'", hostname);
+        char * name = (char *) zhash_lookup (infos, INFO_NAME);
+        assert(name && streq (name, TST_NAME));
+        zsys_debug ("fty-info-test: name = '%s'", name);
+        char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
+        assert(vendor && streq (vendor, TST_VENDOR));
+        zsys_debug ("fty-info-test: vendor = '%s'", vendor);
+        char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
+        assert(serial && streq (serial, TST_SERIAL));
+        zsys_debug ("fty-info-test: serial = '%s'", serial);
+        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
+        assert(model && streq (model, TST_MODEL));
+        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
+        assert(location && streq (location, TST_LOCATION));
+        zsys_debug ("fty-info-test: location = '%s'", location);
+        char * version = (char *) zhash_lookup (infos, INFO_VERSION);
+        assert(version && streq (version, TST_VERSION));
+        zsys_debug ("fty-info-test: version = '%s'", version);
+        char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
+        assert(rest_root && streq (rest_root, TST_PATH));
+        zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
+        char * rest_port = (char *) zhash_lookup (infos, INFO_REST_PORT);
+        assert(rest_port && streq (rest_port, TST_PORT));
+        zsys_debug ("fty-info-test: rest_port = '%s'", rest_port);
+        zhash_destroy(&infos);
+        zmsg_destroy (&recv);
+        zsys_info ("fty-info-test:Test #6: OK");
+       
     }
     mlm_client_destroy (&asset_generator);
     //  @end
