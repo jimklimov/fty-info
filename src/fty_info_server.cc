@@ -333,12 +333,11 @@ s_publish_announce(fty_info_server_t  * self)
     if(!mlm_client_connected(self->announce_client))
         return;
     fty_info_t *info;
-    if (self->announce_test) {
+    if (!self->announce_test) {
         info = fty_info_new (self->rc_message, self->parent_message);
     }
-    if (self->announce_test) {
+    else
         info = fty_info_test_new ();
-    }
     
     //prepare  msg content
     zmsg_t *msg=zmsg_new();
@@ -372,7 +371,6 @@ s_publish_announce(fty_info_server_t  * self)
         else
             zsys_error("cant publish UPDATE msg on ANNOUNCE STREAM");
     }
-        
     zframe_destroy(&frame_infos);
     fty_info_destroy (&info);
     
@@ -980,7 +978,7 @@ fty_info_server_test (bool verbose)
         zsys_debug ("fty-info-test: srv stype = '%s'", srv_stype);
         char *srv_port = zmsg_popstr (recv);
         assert (srv_port && streq (srv_port,"443"));
-        zsys_debug ("fty-info-test: srv stype = '%s'", srv_port);
+        zsys_debug ("fty-info-test: srv port = '%s'", srv_port);
    
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
@@ -1015,6 +1013,11 @@ fty_info_server_test (bool verbose)
         char * rest_port = (char *) zhash_lookup (infos, INFO_REST_PORT);
         assert(rest_port && streq (rest_port, TST_PORT));
         zsys_debug ("fty-info-test: rest_port = '%s'", rest_port);
+        zstr_free (&srv_name);
+        zstr_free (&srv_type); 
+        zstr_free (&srv_stype);
+        zstr_free (&srv_port);
+        
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
         zsys_info ("fty-info-test:Test #6: OK");
