@@ -66,6 +66,9 @@ struct _fty_info_t {
     char *version;
     char *rest_path;
     char *rest_port;
+    char *protocol_format;
+    char *type;
+    char *txtvers;
 };
 
 struct _fty_info_server_t {
@@ -120,7 +123,7 @@ info_server_destroy (fty_info_server_t  **self_p)
             fty_proto_destroy (&self->parent_message);
         //  Free object itself
         free (self);
-        *self_p = NULL;  
+        *self_p = NULL;
     }
 }
 
@@ -204,7 +207,7 @@ s_get_release_details
 fty_info_t*
 fty_info_test_new (void)
 {
-    fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
+    fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
     self->infos     = zhash_new();
     self->uuid      = strdup (TST_UUID);
     self->hostname  = strdup (TST_HOSTNAME);
@@ -216,13 +219,16 @@ fty_info_test_new (void)
     self->version   = strdup (TST_VERSION);
     self->rest_path = strdup (TST_PATH);
     self->rest_port = strdup (TST_PORT);
+    self->protocol_format = strdup ("etnrs");
+    self->type      = strdup ("ipc");
+    self->txtvers   = strdup ("1");
     return self;
 }
 
 fty_info_t*
 fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
 {
-    fty_info_t *self = (fty_info_t *) malloc (sizeof (fty_info_t));
+    fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
     self->infos = zhash_new();
 
     // set hostname
@@ -268,13 +274,18 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
     // TODO: set version
     self->version   = strdup ("NotImplemented");
     // use default
-    self->rest_path = strdup ("/api/v1");
-    // use default
+    self->rest_path = strdup ("/api/v1/comm/connections");
     self->rest_port = strdup ("443");
+    self->protocol_format = strdup ("etnrs");
+    self->type = strdup ("ipc");
+    self->txtvers   = strdup ("1");
 
-    zsys_info ("fty-info:version   = '%s'", self->version);
-    zsys_info ("fty-info:rest_path = '%s'", self->rest_path);
-    zsys_info ("fty-info:rest_port = '%s'", self->rest_port);
+    zsys_info ("fty-info:version = '%s'", self->version);
+    zsys_info ("fty-info:path = '%s'", self->rest_path);
+    zsys_info ("fty-info:port = '%s'", self->rest_port);
+    zsys_info ("fty-info:protocol_format = '%s'", self->protocol_format);
+    zsys_info ("fty-info:type = '%s'", self->type);
+    zsys_info ("fty-info:txtvers = '%s'", self->txtvers);
 
     if(si)
         delete si;
@@ -301,6 +312,9 @@ fty_info_destroy (fty_info_t ** self_ptr)
         zstr_free (&self->version);
         zstr_free (&self->rest_port);
         zstr_free (&self->rest_path);
+        zstr_free (&self->protocol_format);
+        zstr_free (&self->type);
+        zstr_free (&self->txtvers);
         // Free object itself
         free (self);
         *self_ptr = NULL;
@@ -338,7 +352,7 @@ s_publish_announce(fty_info_server_t  * self)
     }
     else
         info = fty_info_test_new ();
-    
+
     //prepare  msg content
     zmsg_t *msg=zmsg_new();
     zmsg_addstr (msg, "IPC"); //TODO postfix with(UUID))
@@ -355,6 +369,9 @@ s_publish_announce(fty_info_server_t  * self)
     zhash_insert(info->infos, INFO_VERSION, info->version);
     zhash_insert(info->infos, INFO_REST_PATH, info->rest_path);
     zhash_insert(info->infos, INFO_REST_PORT, info->rest_port);
+    zhash_insert(info->infos, INFO_PROTOCOL_FORMAT, info->protocol_format);
+    zhash_insert(info->infos, INFO_TYPE, info->type);
+    zhash_insert(info->infos, INFO_TXTVERS, info->txtvers);
 
     zframe_t * frame_infos = zhash_pack(info->infos);
     zmsg_append (msg, &frame_infos);
@@ -373,10 +390,10 @@ s_publish_announce(fty_info_server_t  * self)
     }
     zframe_destroy(&frame_infos);
     fty_info_destroy (&info);
-    
+
 }
 //  --------------------------------------------------------------------------
-//  process pipe message 
+//  process pipe message
 //  return true means continue, false means TERM
 bool static
 s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
@@ -405,7 +422,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
                 zsys_error("mlm_client_connect failed\n");
-            
+
         }
         zstr_free (&endpoint);
     }
@@ -420,7 +437,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char* pattern = zmsg_popstr (message);
         int rv = mlm_client_set_consumer (self->client, stream, pattern);
         if (rv == -1)
-            zsys_error ("%s: can't set consumer on stream '%s', '%s'", 
+            zsys_error ("%s: can't set consumer on stream '%s', '%s'",
                     self->name, stream, pattern);
         zstr_free (&pattern);
         zstr_free (&stream);
@@ -434,7 +451,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 zsys_error("fty_info_announce : mlm_client_connect failed\n");
         rv = mlm_client_set_producer (self->announce_client, stream);
         if (rv == -1)
-            zsys_error ("%s: can't set producer on stream '%s'", 
+            zsys_error ("%s: can't set producer on stream '%s'",
                     self->name, stream);
         else
             //do the first announce
@@ -447,11 +464,11 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     zstr_free (&command);
     zmsg_destroy (&message);
     return true;
-    
+
 }
 
 //  --------------------------------------------------------------------------
-//  process message from FTY_PROTO_ASSET stream 
+//  process message from FTY_PROTO_ASSET stream
 void static
 s_handle_stream(fty_info_server_t* self,zmsg_t *message)
 {
@@ -469,12 +486,12 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
         fty_proto_destroy (&bmessage);
         zmsg_destroy (&message);
         return;
-        
+
     }
     //check whether the message is relevant for us
     const char *operation = fty_proto_operation (bmessage);
     bool found = false;
-    if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) || 
+    if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) ||
         streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
         //are we creating/updating a rack controller?
         const char *type = fty_proto_aux_string (bmessage, "type", "");
@@ -546,10 +563,10 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
         if(found)
             s_publish_announce(self);
     }
-    
+
     fty_proto_destroy (&bmessage);
     zmsg_destroy (&message);
-    
+
 }
 
 //  --------------------------------------------------------------------------
@@ -862,9 +879,9 @@ fty_info_server_test (bool verbose)
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
-        
+
         zclock_sleep (1000);
-        
+
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
         zuuid_t *zuuid = zuuid_new ();
@@ -979,7 +996,7 @@ fty_info_server_test (bool verbose)
         char *srv_port = zmsg_popstr (recv);
         assert (srv_port && streq (srv_port,"443"));
         zsys_debug ("fty-info-test: srv port = '%s'", srv_port);
-   
+
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
@@ -1014,14 +1031,14 @@ fty_info_server_test (bool verbose)
         assert(rest_port && streq (rest_port, TST_PORT));
         zsys_debug ("fty-info-test: rest_port = '%s'", rest_port);
         zstr_free (&srv_name);
-        zstr_free (&srv_type); 
+        zstr_free (&srv_type);
         zstr_free (&srv_stype);
         zstr_free (&srv_port);
-        
+
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
         zsys_info ("fty-info-test:Test #6: OK");
-       
+
     }
     mlm_client_destroy (&asset_generator);
     //  @end
