@@ -25,7 +25,8 @@
 @discuss
 @end
 */
-#define TIMEOUT_MS 30000   //wait at least 30 seconds
+#define TIMEOUT_MS -1   //wait infinitelly
+
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 //test value for INFO-TEST command reply
@@ -359,38 +360,41 @@ s_publish_announce(fty_info_server_t  * self)
     zmsg_addstr (msg, "_https._tcp.");
     zmsg_addstr (msg, "_powerservice._sub._https._tcp.");
     zmsg_addstr (msg, "443");
-    zhash_insert(info->infos, INFO_UUID, info->uuid);
-    zhash_insert(info->infos, INFO_HOSTNAME, info->hostname);
-    zhash_insert(info->infos, INFO_NAME, info->iname);
-    zhash_insert(info->infos, INFO_VENDOR, info->vendor);
-    zhash_insert(info->infos, INFO_MODEL, info->model);
-    zhash_insert(info->infos, INFO_SERIAL, info->serial);
-    zhash_insert(info->infos, INFO_LOCATION, info->location);
-    zhash_insert(info->infos, INFO_VERSION, info->version);
-    zhash_insert(info->infos, INFO_REST_PATH, info->rest_path);
-    zhash_insert(info->infos, INFO_REST_PORT, info->rest_port);
-    zhash_insert(info->infos, INFO_PROTOCOL_FORMAT, info->protocol_format);
-    zhash_insert(info->infos, INFO_TYPE, info->type);
-    zhash_insert(info->infos, INFO_TXTVERS, info->txtvers);
 
-    zframe_t * frame_infos = zhash_pack(info->infos);
+    zhash_t *map = zhash_new ();
+    zhash_autofree (map);
+    zhash_insert(map, INFO_UUID, info->uuid);
+    zhash_insert(map, INFO_HOSTNAME, info->hostname);
+    zhash_insert(map, INFO_NAME, info->iname);
+    zhash_insert(map, INFO_VENDOR, info->vendor);
+    zhash_insert(map, INFO_MODEL, info->model);
+    zhash_insert(map, INFO_SERIAL, info->serial);
+    zhash_insert(map, INFO_LOCATION, info->location);
+    zhash_insert(map, INFO_VERSION, info->version);
+    zhash_insert(map, INFO_REST_PATH, info->rest_path);
+    zhash_insert(map, INFO_REST_PORT, info->rest_port);
+    zhash_insert(map, INFO_PROTOCOL_FORMAT, info->protocol_format);
+    zhash_insert(map, INFO_TYPE, info->type);
+    zhash_insert(map, INFO_TXTVERS, info->txtvers);
+
+    zframe_t * frame_infos = zhash_pack(map);
     zmsg_append (msg, &frame_infos);
-    if (self->first_announce){
-        if(mlm_client_send (self->announce_client,"CREATE",&msg )!=-1){
+    if (self->first_announce) {
+        if (mlm_client_send (self->announce_client, "CREATE", &msg) != -1) {
             zsys_info("publish CREATE msg on ANNOUNCE STREAM");
             self->first_announce=false;
         }
         else
             zsys_error("cant publish CREATE msg on ANNOUNCE STREAM");
-    }else{
-        if(mlm_client_send (self->announce_client,"UPDATE",&msg )!=-1)
+    } else {
+        if (mlm_client_send (self->announce_client, "UPDATE", &msg) != -1)
             zsys_info("publish UPDATE msg on ANNOUNCE STREAM");
         else
             zsys_error("cant publish UPDATE msg on ANNOUNCE STREAM");
     }
     zframe_destroy(&frame_infos);
+    zhash_destroy (&map);
     fty_info_destroy (&info);
-
 }
 //  --------------------------------------------------------------------------
 //  process pipe message
@@ -458,13 +462,15 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             s_publish_announce(self);
         zstr_free (&stream);
     }
+    else if (streq (command, "ANNOUNCE")) {
+        s_publish_announce (self);
+    }
     else
         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
 
     zstr_free (&command);
     zmsg_destroy (&message);
     return true;
-
 }
 
 //  --------------------------------------------------------------------------
