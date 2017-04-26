@@ -30,17 +30,20 @@
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 //test value for INFO-TEST command reply
-#define TST_UUID     "ce7c523e-08bf-11e7-af17-080027d52c4f"
-#define TST_HOSTNAME "localhost"
-#define TST_NAME     "ipc-001"
-#define TST_MODEL    "IPC3000"
-#define TST_VENDOR   "Eaton"
-#define TST_SERIAL   "LA71026006"
-#define TST_LOCATION "Rack1"
-#define TST_LOCATION2 "Rack2"
-#define TST_VERSION  "1.0.0"
-#define TST_PATH     "/api/v1"
-#define TST_PORT     "80"
+#define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
+#define TST_HOSTNAME    "localhost"
+#define TST_NAME        "MyIPC"
+#define TST_NAME_URI    "/asset/ipc-001"
+#define TST_MODEL       "IPC3000"
+#define TST_VENDOR      "Eaton"
+#define TST_SERIAL      "LA71026006"
+#define TST_LOCATION         "Rack1"
+#define TST_LOCATION_URI     "/asset/rack-001"
+#define TST_LOCATION2        "Rack2"
+#define TST_LOCATION2_URI    "/asset/rack-002"
+#define TST_VERSION     "1.0.0"
+#define TST_PATH        "/api/v1"
+#define TST_PORT        "80"
 
 
 #include <string>
@@ -59,11 +62,13 @@ struct _fty_info_t {
     zhash_t *infos;
     char *uuid;
     char *hostname;
-    char *iname;
+    char *name;
+    char *name_uri;
     char *model;
     char *vendor;
     char *serial;
     char *location;
+    char *location_uri;
     char *version;
     char *rest_path;
     char *rest_port;
@@ -86,7 +91,7 @@ struct _fty_info_server_t {
 };
 
 //  --------------------------------------------------------------------------
-//  Create a new mango_profpga_config_server
+//  Create a new fty_info_server
 
 fty_info_server_t  *
 info_server_new (char *name)
@@ -103,7 +108,7 @@ info_server_new (char *name)
     return self;
 }
 //  --------------------------------------------------------------------------
-//  Destroy the mango_profpga_config_server
+//  Destroy the fty_info_server
 
 void
 info_server_destroy (fty_info_server_t  **self_p)
@@ -212,11 +217,13 @@ fty_info_test_new (void)
     self->infos     = zhash_new();
     self->uuid      = strdup (TST_UUID);
     self->hostname  = strdup (TST_HOSTNAME);
-    self->iname     = strdup (TST_NAME);
+    self->name      = strdup (TST_NAME);
+    self->name_uri  = strdup (TST_NAME_URI);
     self->model     = strdup (TST_MODEL);
     self->vendor    = strdup (TST_VENDOR);
     self->serial    = strdup (TST_SERIAL);
     self->location  = strdup (TST_LOCATION);
+    self->location_uri  = strdup (TST_LOCATION_URI);
     self->version   = strdup (TST_VERSION);
     self->rest_path = strdup (TST_PATH);
     self->rest_port = strdup (TST_PORT);
@@ -247,17 +254,40 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
 
     //set name
     if (rc_message != NULL)
-        self->iname = strdup (fty_proto_name (rc_message));
+        self->name = strdup (fty_proto_ext_string (rc_message, "name", "NA"));
     else
-        self->iname = strdup ("NA");
-    zsys_info ("fty-info:name      = '%s'", self-> iname);
+        self->name = strdup ("NA");
+    zsys_info ("fty-info:name      = '%s'", self-> name);
+
+    //set name_uri
+    if (rc_message != NULL) {
+        std::string asset("/asset/");
+        self->name_uri = strdup ((asset + strdup (fty_proto_name (rc_message))).c_str ());
+    }
+    else
+        self->name_uri = strdup ("NA");
+    zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
     //set location (parent)
-    if (rc_message != NULL)
-        self->location  = strdup (fty_proto_aux_string (rc_message, "parent", "NA"));
+    if (parent_message != NULL)
+        self->location  = strdup (fty_proto_ext_string (parent_message, "name", "NA"));
     else
         self->location  = strdup ("NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
+
+    //set location_uri
+    if (rc_message != NULL) {
+        const char *location_uri  = strdup (fty_proto_aux_string (rc_message, "parent", "NA"));
+        if (!streq (location_uri, "NA")) {
+            std::string asset("/asset/");
+            self->location_uri = strdup ((asset + strdup (fty_proto_name (rc_message))).c_str ());
+        }
+        else
+            self->location_uri = strdup ("NA");
+    }
+    else
+        self->location_uri  = strdup ("NA");
+    zsys_info ("fty-info:location_uri  = '%s'", self->location_uri);
 
     //set uuid, vendor, model from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
@@ -305,11 +335,13 @@ fty_info_destroy (fty_info_t ** self_ptr)
         zhash_destroy(&self->infos);
         zstr_free (&self->uuid);
         zstr_free (&self->hostname);
-        zstr_free (&self->iname);
+        zstr_free (&self->name);
+        zstr_free (&self->name_uri);
         zstr_free (&self->model);
         zstr_free (&self->vendor);
         zstr_free (&self->serial);
         zstr_free (&self->location);
+        zstr_free (&self->location_uri);
         zstr_free (&self->version);
         zstr_free (&self->rest_port);
         zstr_free (&self->rest_path);
@@ -365,11 +397,14 @@ s_publish_announce(fty_info_server_t  * self)
     zhash_autofree (map);
     zhash_insert(map, INFO_UUID, info->uuid);
     zhash_insert(map, INFO_HOSTNAME, info->hostname);
-    zhash_insert(map, INFO_NAME, info->iname);
+    zhash_insert(map, INFO_NAME, info->name);
+    zhash_insert(map, INFO_NAME_URI, info->name_uri);
+    zhash_insert(map, INFO_VENDOR, info->vendor);
     zhash_insert(map, INFO_VENDOR, info->vendor);
     zhash_insert(map, INFO_MODEL, info->model);
     zhash_insert(map, INFO_SERIAL, info->serial);
     zhash_insert(map, INFO_LOCATION, info->location);
+    zhash_insert(map, INFO_LOCATION_URI, info->location_uri);
     zhash_insert(map, INFO_VERSION, info->version);
     zhash_insert(map, INFO_REST_PATH, info->rest_path);
     zhash_insert(map, INFO_REST_PORT, info->rest_port);
@@ -559,9 +594,9 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
             }
         }
         const char *name = fty_proto_name (bmessage);
-        if (self->rc_message == NULL || streq (name, fty_proto_aux_string (self->rc_message, "parent", ""))) {
-            // not used right now - location is internal asset name which does not changes
-            if(self->parent_message)
+        if (self->rc_message != NULL && streq (name, fty_proto_aux_string (self->rc_message, "parent", ""))) {
+            // save parent message, because it contains ext name for location
+            if (self->parent_message)
                 fty_proto_destroy (&(self->parent_message));
             self->parent_message = fty_proto_dup (bmessage);
             found=true;
@@ -612,11 +647,13 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         zmsg_addstrf (reply, "%s", zuuid);
         zhash_insert(info->infos, INFO_UUID, info->uuid);
         zhash_insert(info->infos, INFO_HOSTNAME, info->hostname);
-        zhash_insert(info->infos, INFO_NAME, info->iname);
+        zhash_insert(info->infos, INFO_NAME, info->name);
+        zhash_insert(info->infos, INFO_NAME_URI, info->name_uri);
         zhash_insert(info->infos, INFO_VENDOR, info->vendor);
         zhash_insert(info->infos, INFO_MODEL, info->model);
         zhash_insert(info->infos, INFO_SERIAL, info->serial);
         zhash_insert(info->infos, INFO_LOCATION, info->location);
+        zhash_insert(info->infos, INFO_LOCATION_URI, info->location_uri);
         zhash_insert(info->infos, INFO_VERSION, info->version);
         zhash_insert(info->infos, INFO_REST_PATH, info->rest_path);
         zhash_insert(info->infos, INFO_REST_PORT, info->rest_port);
@@ -742,6 +779,9 @@ fty_info_server_test (bool verbose)
         char * name = (char *) zhash_lookup (infos, INFO_NAME);
         assert(name && streq (name, TST_NAME));
         zsys_debug ("fty-info-test: name = '%s'", name);
+        char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
+        assert(name_uri && streq (name_uri, TST_NAME_URI));
+        zsys_debug ("fty-info-test: name_uri = '%s'", name_uri);
         char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
         assert(vendor && streq (vendor, TST_VENDOR));
         zsys_debug ("fty-info-test: vendor = '%s'", vendor);
@@ -754,6 +794,9 @@ fty_info_server_test (bool verbose)
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
+        char * location_uri = (char *) zhash_lookup (infos, INFO_LOCATION_URI);
+        assert(location_uri && streq (location_uri, TST_LOCATION_URI));
+        zsys_debug ("fty-info-test: location_uri = '%s'", location_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
@@ -807,14 +850,16 @@ fty_info_server_test (bool verbose)
     // Test #3: process asset message - CREATE RC
     {
         zsys_debug ("fty-info-test:Test #3");
+        const char *name = TST_NAME;
         const char *location = TST_LOCATION;
         zhash_t* aux = zhash_new ();
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
         zhash_autofree (ext);
         zhash_update (aux, "type", (void *) "device");
-	zhash_update (aux, "subtype", (void *) "rackcontroller");
-	zhash_update (aux, "parent", (void *) location);
+	    zhash_update (aux, "subtype", (void *) "rackcontroller");
+	    zhash_update (aux, "parent", (void *) location);
+        zhash_update (ext, "name", (void *) name);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
         zmsg_t *msg = fty_proto_encode_asset (
@@ -849,10 +894,14 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-		if (streq (key, "name"))
-			assert (streq (value, TST_NAME));
-		if (streq (key, "location"))
-			assert (streq (value, TST_LOCATION));
+            if (streq (key, INFO_NAME))
+                assert (streq (value, TST_NAME));
+            if (streq (key, INFO_NAME_URI))
+                assert (streq (value, TST_NAME_URI));
+            if (streq (key, INFO_LOCATION))
+                assert (streq (value, TST_LOCATION));
+            if (streq (key, INFO_LOCATION_URI))
+                assert (streq (value, TST_LOCATION_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -869,10 +918,12 @@ fty_info_server_test (bool verbose)
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
         zhash_autofree (ext);
+        const char *name = TST_NAME;
         const char *location = TST_LOCATION2;
         zhash_update (aux, "type", (void *) "device");
-	zhash_update (aux, "subtype", (void *) "rackcontroller");
+        zhash_update (aux, "subtype", (void *) "rackcontroller");
         zhash_update (aux, "parent", (void *) location);
+        zhash_update (ext, "name", (void *) name);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
         zmsg_t *msg = fty_proto_encode_asset (
@@ -907,10 +958,14 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-		if (streq (key, "name"))
-			assert (streq (value, TST_NAME));
-		if (streq (key, "location"))
-			assert (streq (value, TST_LOCATION2));
+            if (streq (key, INFO_NAME))
+                assert (streq (value, TST_NAME));
+            if (streq (key, INFO_NAME_URI))
+                assert (streq (value, TST_NAME_URI));
+            if (streq (key, INFO_LOCATION))
+                assert (streq (value, TST_LOCATION2));
+            if (streq (key, INFO_LOCATION_URI))
+                assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -967,9 +1022,9 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-		if (streq (key, "name"))
+		if (streq (key, INFO_NAME))
 			assert (streq (value, TST_NAME));
-		if (streq (key, "location"))
+		if (streq (key, INFO_LOCATION))
 			assert (streq (value, TST_LOCATION2));
             value     = (char *) zhash_next (infos);   // next value
         }
@@ -1015,6 +1070,9 @@ fty_info_server_test (bool verbose)
         char * name = (char *) zhash_lookup (infos, INFO_NAME);
         assert(name && streq (name, TST_NAME));
         zsys_debug ("fty-info-test: name = '%s'", name);
+        char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
+        assert(name_uri && streq (name_uri, TST_NAME_URI));
+        zsys_debug ("fty-info-test: name_uri = '%s'", name_uri);
         char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
         assert(vendor && streq (vendor, TST_VENDOR));
         zsys_debug ("fty-info-test: vendor = '%s'", vendor);
@@ -1027,6 +1085,9 @@ fty_info_server_test (bool verbose)
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
+        char * location_uri = (char *) zhash_lookup (infos, INFO_LOCATION_URI);
+        assert(location_uri && streq (location_uri, TST_LOCATION_URI));
+        zsys_debug ("fty-info-test: location_uri = '%s'", location_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
@@ -1046,6 +1107,7 @@ fty_info_server_test (bool verbose)
         zsys_info ("fty-info-test:Test #6: OK");
 
     }
+    //TODO: test that we accept a parent message
     mlm_client_destroy (&asset_generator);
     //  @end
     zactor_destroy (&info_server);
