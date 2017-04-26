@@ -33,13 +33,16 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 #define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME    "localhost"
 #define TST_NAME        "MyIPC"
+#define TST_INAME       "ipc-001"
 #define TST_NAME_URI    "/asset/ipc-001"
 #define TST_MODEL       "IPC3000"
 #define TST_VENDOR      "Eaton"
 #define TST_SERIAL      "LA71026006"
 #define TST_LOCATION         "Rack1"
+#define TST_LOCATION_INAME   "rack-001"
 #define TST_LOCATION_URI     "/asset/rack-001"
 #define TST_LOCATION2        "Rack2"
+#define TST_LOCATION2_INAME  "rack-002"
 #define TST_LOCATION2_URI    "/asset/rack-002"
 #define TST_VERSION     "1.0.0"
 #define TST_PATH        "/api/v1"
@@ -262,7 +265,7 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
     //set name_uri
     if (rc_message != NULL) {
         std::string asset("/asset/");
-        self->name_uri = strdup ((asset + strdup (fty_proto_name (rc_message))).c_str ());
+        self->name_uri = strdup ((asset + fty_proto_name (rc_message)).c_str ());
     }
     else
         self->name_uri = strdup ("NA");
@@ -277,10 +280,10 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
 
     //set location_uri
     if (rc_message != NULL) {
-        const char *location_uri  = strdup (fty_proto_aux_string (rc_message, "parent", "NA"));
+        const char *location_uri  = fty_proto_aux_string (rc_message, "parent", "NA");
         if (!streq (location_uri, "NA")) {
             std::string asset("/asset/");
-            self->location_uri = strdup ((asset + strdup (fty_proto_name (rc_message))).c_str ());
+            self->location_uri = strdup ((asset + location_uri).c_str ());
         }
         else
             self->location_uri = strdup ("NA");
@@ -851,7 +854,7 @@ fty_info_server_test (bool verbose)
     {
         zsys_debug ("fty-info-test:Test #3");
         const char *name = TST_NAME;
-        const char *location = TST_LOCATION;
+        const char *location = TST_LOCATION_INAME;
         zhash_t* aux = zhash_new ();
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
@@ -864,7 +867,7 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *msg = fty_proto_encode_asset (
                 aux,
-                TST_NAME,
+                TST_INAME,
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
@@ -898,8 +901,6 @@ fty_info_server_test (bool verbose)
                 assert (streq (value, TST_NAME));
             if (streq (key, INFO_NAME_URI))
                 assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION))
-                assert (streq (value, TST_LOCATION));
             if (streq (key, INFO_LOCATION_URI))
                 assert (streq (value, TST_LOCATION_URI));
             value     = (char *) zhash_next (infos);   // next value
@@ -919,7 +920,7 @@ fty_info_server_test (bool verbose)
         zhash_autofree (aux);
         zhash_autofree (ext);
         const char *name = TST_NAME;
-        const char *location = TST_LOCATION2;
+        const char *location = TST_LOCATION2_INAME;
         zhash_update (aux, "type", (void *) "device");
         zhash_update (aux, "subtype", (void *) "rackcontroller");
         zhash_update (aux, "parent", (void *) location);
@@ -928,7 +929,7 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *msg = fty_proto_encode_asset (
                 aux,
-                TST_NAME,
+                TST_INAME,
                 FTY_PROTO_ASSET_OP_UPDATE,
                 ext);
 
@@ -962,8 +963,6 @@ fty_info_server_test (bool verbose)
                 assert (streq (value, TST_NAME));
             if (streq (key, INFO_NAME_URI))
                 assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION))
-                assert (streq (value, TST_LOCATION2));
             if (streq (key, INFO_LOCATION_URI))
                 assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
@@ -983,7 +982,7 @@ fty_info_server_test (bool verbose)
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
         zhash_autofree (ext);
-        const char *location = TST_LOCATION;
+        const char *location = TST_LOCATION_INAME;
         zhash_update (aux, "type", (void *) "device");
         zhash_update (aux, "subtype", (void *) "rack controller");
         zhash_update (aux, "parent", (void *) location);
@@ -992,7 +991,7 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *msg = fty_proto_encode_asset (
                 aux,
-                TST_NAME,
+                TST_INAME,
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
@@ -1022,10 +1021,12 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-		if (streq (key, INFO_NAME))
-			assert (streq (value, TST_NAME));
-		if (streq (key, INFO_LOCATION))
-			assert (streq (value, TST_LOCATION2));
+            if (streq (key, INFO_NAME))
+                assert (streq (value, TST_NAME));
+            if (streq (key, INFO_NAME_URI))
+                assert (streq (value, TST_NAME_URI));
+            if (streq (key, INFO_LOCATION_URI))
+                assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
