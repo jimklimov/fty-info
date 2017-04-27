@@ -97,7 +97,7 @@ struct _fty_info_server_t {
     bool first_announce;
     bool announce_test;
     fty_proto_t* rc_message;
-    fty_proto_t* parent_message;
+    zhashx_t* assets;
 };
 
 //  --------------------------------------------------------------------------
@@ -115,6 +115,7 @@ info_server_new (char *name)
     self->verbose=false;
     self->first_announce=true;
     self->announce_test=false;
+    self->assets = zhashx_new ();
     return self;
 }
 //  --------------------------------------------------------------------------
@@ -135,8 +136,8 @@ info_server_destroy (fty_info_server_t  **self_p)
             zstr_free(&self->endpoint);
         if(self->rc_message)
             fty_proto_destroy (&self->rc_message);
-        if(self->parent_message)
-            fty_proto_destroy (&self->parent_message);
+        if(self->assets)
+            zhashx_destroy (&self->assets);
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -257,7 +258,7 @@ fty_info_test_new (void)
 }
 
 fty_info_t*
-fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
+fty_info_new (fty_proto_t *rc_message, zhashx_t *assets)
 {
     fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
     self->infos = zhash_new();
@@ -291,9 +292,35 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
         self->name_uri = strdup ("NA");
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
-    //set location (parent)
-    if (parent_message != NULL)
-        self->location  = strdup (fty_proto_ext_string (parent_message, "name", "NA"));
+    //set location
+    if (rc_message != NULL) {
+        fty_proto_t *rack_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (rc_message, "parent", ""));
+        if (rack_message != NULL) {
+            fty_proto_t *row_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (rack_message, "parent", ""));
+            if (row_message != NULL) {
+                fty_proto_t *room_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (row_message, "parent", ""));
+                if (room_message != NULL) {
+                    fty_proto_t *dc_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (room_message, "parent", ""));
+                    if (dc_message != NULL) {
+                        std::string delimiter(">");
+                        self->location = strdup ((fty_proto_ext_string (dc_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (room_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (row_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (rack_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (rc_message, "name", "")).c_str ());
+                    }
+                    else
+                        self->location  = strdup ("NA");
+                }
+                else
+                    self->location  = strdup ("NA");
+            }  
+            else
+                self->location  = strdup ("NA");
+        }
+        else
+            self->location  = strdup ("NA");
+    }    
     else
         self->location  = strdup ("NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
@@ -402,7 +429,7 @@ s_publish_announce(fty_info_server_t  * self)
         return;
     fty_info_t *info;
     if (!self->announce_test) {
-        info = fty_info_new (self->rc_message, self->parent_message);
+        info = fty_info_new (self->rc_message, self->assets);
     }
     else
         info = fty_info_test_new ();
@@ -616,14 +643,9 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
             }
         }
         const char *name = fty_proto_name (bmessage);
-        if (self->rc_message != NULL && streq (name, fty_proto_aux_string (self->rc_message, "parent", ""))) {
-            // save parent message, because it contains ext name for location
-            if (self->parent_message)
-                fty_proto_destroy (&(self->parent_message));
-            self->parent_message = fty_proto_dup (bmessage);
-            found=true;
-        }
-        if(found)
+        zhashx_update (self->assets, name, fty_proto_dup (bmessage));
+        zhashx_freefn (self->assets, name, (void (*) (void*))fty_proto_destroy);
+        if (found)
             s_publish_announce(self);
     }
 
@@ -677,7 +699,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         char *zuuid = zmsg_popstr (message);
         fty_info_t *info;
         if (streq(command, "INFO")) {
-            info = fty_info_new (self->rc_message, self->parent_message);
+            info = fty_info_new (self->rc_message, self->assets);
         }
         if (streq(command, "INFO-TEST")) {
             info = fty_info_test_new ();
