@@ -252,7 +252,15 @@ topologyresolver_to_list (topologyresolver_t *self)
     zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
 
     // TODO: replace with zhash lookup one whoami is done
-    fty_proto_t *msg = fty_proto_new(FTY_PROTO_ASSET);
+    fty_proto_t *msg;
+    if (self->iname) {
+        msg = zhashx_lookup (self->assets, self->iname);
+        if (!msg)
+            return list;
+    }
+    else
+        return list;
+
 
     char buffer[16]; // strlen ("parent_name.123") + 1
     for (int i=1; i<100; i++) {
@@ -264,7 +272,7 @@ topologyresolver_to_list (topologyresolver_t *self)
             zlistx_purge (list);
             break;
         } else {
-            zlistx_add_end (list, (void *)parent);
+            zlistx_add_start (list, (void *)parent);
         }
     }
 
