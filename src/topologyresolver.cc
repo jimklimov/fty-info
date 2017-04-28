@@ -97,7 +97,7 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
-    return NULL;
+    return "NA";
 }
 
 

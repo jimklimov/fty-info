@@ -98,6 +98,7 @@ struct _fty_info_server_t {
     bool announce_test;
     fty_proto_t* rc_message;
     zhashx_t* assets;
+    topologyresolver_t* resolver;
 };
 
 //  --------------------------------------------------------------------------
@@ -130,14 +131,11 @@ info_server_destroy (fty_info_server_t  **self_p)
         //  Free class properties here
         mlm_client_destroy (&self->client);
         mlm_client_destroy (&self->announce_client);
-        if(self->name)
-            zstr_free(&self->name);
-        if(self->endpoint)
-            zstr_free(&self->endpoint);
-        if(self->rc_message)
-            fty_proto_destroy (&self->rc_message);
-        if(self->assets)
-            zhashx_destroy (&self->assets);
+        zstr_free(&self->name);
+        zstr_free(&self->endpoint);
+        fty_proto_destroy (&self->rc_message);
+        zhashx_destroy (&self->assets);
+        topologyresolver_destroy (&self->resolver);
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -258,7 +256,7 @@ fty_info_test_new (void)
 }
 
 fty_info_t*
-fty_info_new (fty_proto_t *rc_message, zhashx_t *assets)
+fty_info_new (fty_proto_t *rc_message, zhashx_t *assets, topologyresolver_t *resolver)
 {
     fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
     self->infos = zhash_new();
@@ -293,6 +291,7 @@ fty_info_new (fty_proto_t *rc_message, zhashx_t *assets)
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
     //set location
+    self->location = strdup (topologyresolver_to_string (resolver, ">"));
     if (rc_message != NULL) {
         fty_proto_t *rack_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (rc_message, "parent", ""));
         if (rack_message != NULL) {
@@ -321,8 +320,6 @@ fty_info_new (fty_proto_t *rc_message, zhashx_t *assets)
         else
             self->location  = strdup ("NA");
     }
-    else
-        self->location  = strdup ("NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set location_uri
@@ -429,7 +426,7 @@ s_publish_announce(fty_info_server_t  * self)
         return;
     fty_info_t *info;
     if (!self->announce_test) {
-        info = fty_info_new (self->rc_message, self->assets);
+        info = fty_info_new (self->rc_message, self->assets, self->resolver);
     }
     else
         info = fty_info_test_new ();
@@ -613,6 +610,7 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
                             if(self->rc_message)
                                 fty_proto_destroy (&(self->rc_message));
                             self->rc_message = fty_proto_dup (bmessage);
+                            self->resolver = topologyresolver_new (fty_proto_name (bmessage));
                             //try another network interface only if match was not found
                             break;
                         }
@@ -638,6 +636,7 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
                             if(self->rc_message)
                                 fty_proto_destroy (&(self->rc_message));
                             self->rc_message = fty_proto_dup (bmessage);
+                            self->resolver = topologyresolver_new (fty_proto_name (bmessage));
                             //try another network interface only if match was not found
                             break;
                         }
@@ -654,6 +653,7 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
         const char *name = fty_proto_name (bmessage);
         zhashx_update (self->assets, name, fty_proto_dup (bmessage));
         zhashx_freefn (self->assets, name, fty_msg_free_fn);
+        topologyresolver_asset (self->resolver, bmessage);
         if (found)
             s_publish_announce(self);
     }
@@ -708,7 +708,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         char *zuuid = zmsg_popstr (message);
         fty_info_t *info;
         if (streq(command, "INFO")) {
-            info = fty_info_new (self->rc_message, self->assets);
+            info = fty_info_new (self->rc_message, self->assets, self->resolver);
         }
         if (streq(command, "INFO-TEST")) {
             info = fty_info_test_new ();
@@ -1228,7 +1228,8 @@ fty_info_server_test (bool verbose)
         zsys_info ("fty-info-test:Test #6: OK");
 
     }
-    //TODO: test that we accept a parent message
+    //TODO: test that we construct topology properly
+    //TODO: test that UPDATE message updates the topology properly
     mlm_client_destroy (&asset_generator);
     //  @end
     zactor_destroy (&info_server);
