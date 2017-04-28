@@ -88,16 +88,16 @@ s_local_addresses()
 //of this asset the same as one of the local addresses?
 bool is_this_me (fty_proto_t *asset)
 {
-    const char *operation = fty_proto_operation (bmessage);
+    const char *operation = fty_proto_operation (asset);
     bool found = false;
     if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) ||
         streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
         //are we creating/updating a rack controller?
-        const char *type = fty_proto_aux_string (bmessage, "type", "");
-        const char *subtype = fty_proto_aux_string (bmessage, "subtype", "");
+        const char *type = fty_proto_aux_string (asset, "type", "");
+        const char *subtype = fty_proto_aux_string (asset, "subtype", "");
         if (streq (type, "device") || streq (subtype, "rackcontroller")) {
             auto ifaces = s_local_addresses ();
-            zhash_t *ext = fty_proto_ext (bmessage);
+            zhash_t *ext = fty_proto_ext (asset);
 
             int ipv6_index = 1;
             found = false;
