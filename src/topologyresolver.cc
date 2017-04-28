@@ -253,7 +253,6 @@ topologyresolver_to_list (topologyresolver_t *self)
     zlistx_set_destructor (list, (void (*)(void**))zstr_free);
     zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
 
-    // TODO: replace with zhash lookup one whoami is done
     fty_proto_t *msg;
     if (self->iname) {
         msg = zhashx_lookup (self->assets, self->iname);
@@ -278,7 +277,5 @@ topologyresolver_to_list (topologyresolver_t *self)
         }
     }
 
-    // TODO: remove when lookup is done
-    fty_proto_destroy (&msg);
     return list;
 }
