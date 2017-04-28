@@ -153,11 +153,10 @@ bool is_this_me (fty_proto_t *asset)
 topologyresolver_t *
 topologyresolver_new (const char *iname)
 {
-    if (! iname) return NULL;
     topologyresolver_t *self = (topologyresolver_t *) zmalloc (sizeof (topologyresolver_t));
     assert (self);
     //  Initialize class properties here
-    self->iname = strdup (iname);
+    if (iname) self->iname = strdup (iname);
     self->assets = zhashx_new ();
     zhashx_set_destructor (self->assets, (czmq_destructor *) fty_proto_destroy);
     zhashx_set_duplicator (self->assets, (czmq_duplicator *) fty_proto_dup);
@@ -191,6 +190,9 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
     if (! message) return;
     if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
 
+    if (!self->iname && is_this_me (message)) {
+        self->iname = strdup (fty_proto_name (message));
+    }
     const char *iname = fty_proto_name (message);
     zhashx_update (self->assets, iname, message);
 }
