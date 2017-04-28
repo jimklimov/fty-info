@@ -525,7 +525,7 @@ void fty_msg_free_fn(void *data)
 //  --------------------------------------------------------------------------
 //  process message from FTY_PROTO_ASSET stream
 void static
-s_handle_stream(fty_info_server_t* self,zmsg_t *message)
+s_handle_stream (fty_info_server_t* self, zmsg_t *message)
 {
     if (!is_fty_proto (message)){
         zmsg_destroy (&message);
@@ -650,6 +650,7 @@ fty_info_server (zsock_t *pipe, void *args)
     }
 
     fty_info_server_t *self = info_server_new (name);
+    self->resolver = topologyresolver_new (NULL);
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (self->client), NULL);
     assert (poller);
 
