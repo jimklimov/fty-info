@@ -39,6 +39,7 @@ typedef enum {
 
 struct _topologyresolver_t {
     char *iname;
+    char *topology;
     int state;
     zhashx_t *assets;
 };
@@ -176,6 +177,7 @@ topologyresolver_destroy (topologyresolver_t **self_p)
         //  Free class properties here
         zhashx_destroy (&self->assets);
         zstr_free (&self->iname);
+        zstr_free (&self->topology);
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -203,7 +205,6 @@ const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
     int size = 0;
-    char *topology = NULL;
     zlistx_t *parents = topologyresolver_to_list (self);
     char *next = (char *) zlistx_first (parents);
     if (!next) {
@@ -211,6 +212,7 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         return "NA";
     }
     else {
+        zstr_free (&self->topology);
         char *last = (char *) zlistx_last (parents);
         while (next && (!streq (next,last))) {
             size += strlen (next);
@@ -219,8 +221,9 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
             next = (char *) zlistx_next (parents);
         }
         zstr_free (&next);
-        topology = (char *) calloc (sizeof (char), size + strlen(last) + 1);
+        self->topology = (char *) calloc (sizeof (char), size + strlen(last) + 1);
 
+        char *topology = self->topology;
         next = (char *) zlistx_first (parents);
         while (next && (!streq (next, last))) {
             strncpy (topology, next, strlen (next));
@@ -236,8 +239,7 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         zstr_free (&last);
         zlistx_destroy (&parents);
         topology = '\0';
-        topology -= size + 1;
-        return (const char *) topology;
+        return (const char *) self->topology;
     }
 }
 
@@ -273,4 +275,11 @@ topologyresolver_to_list (topologyresolver_t *self)
     // TODO: remove when lookup is done
     fty_proto_destroy (&msg);
     return list;
+}
+
+void
+topologyresolver_test (bool verbose)
+{
+    printf (" * topologyresolver_test: ");
+    printf ("OK\n");
 }

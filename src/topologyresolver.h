@@ -48,6 +48,10 @@ FTY_INFO_PRIVATE const char *
 FTY_INFO_PRIVATE zlistx_t *
     topologyresolver_to_list (topologyresolver_t *self);
 
+// Selftest for this class
+FTY_INFO_PRIVATE void
+    topologyresolver_test (bool verbose);
+
 
 //  @end
 
