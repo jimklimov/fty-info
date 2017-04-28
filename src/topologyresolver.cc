@@ -255,7 +255,7 @@ topologyresolver_to_list (topologyresolver_t *self)
 
     fty_proto_t *msg;
     if (self->iname) {
-        msg = zhashx_lookup (self->assets, self->iname);
+        msg = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (!msg)
             return list;
     }
