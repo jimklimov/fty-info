@@ -43,6 +43,109 @@ struct _topologyresolver_t {
     zhashx_t *assets;
 };
 
+static std::map<std::string,std::set<std::string>>
+s_local_addresses()
+{
+    struct ifaddrs *interfaces, *iface;
+    char host[NI_MAXHOST];
+    std::map<std::string,std::set<std::string>> result;
+
+    if (getifaddrs (&interfaces) == -1) {
+        return result;
+    }
+    iface = interfaces;
+    for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+        if (iface->ifa_addr == NULL) continue;
+        int family = iface->ifa_addr->sa_family;
+        if (family == AF_INET || family == AF_INET6) {
+            if (
+                    getnameinfo(iface->ifa_addr,
+                        (family == AF_INET) ? sizeof(struct sockaddr_in) :
+                        sizeof(struct sockaddr_in6),
+                        host, NI_MAXHOST,
+                        NULL, 0, NI_NUMERICHOST) == 0
+               ) {
+                // sometimes IPv6 addres looks like ::2342%IfaceName
+                char *p = strchr (host, '%');
+                if (p) *p = 0;
+
+                auto it = result.find (iface->ifa_name);
+                if (it == result.end()) {
+                    std::set<std::string> aSet;
+                    aSet.insert (host);
+                    result [iface->ifa_name] = aSet;
+                } else {
+                    result [iface->ifa_name].insert (host);
+                }
+            }
+        }
+    }
+    freeifaddrs (interfaces);
+    return result;
+}
+
+//check if this is our rack controller - is any IP address
+//of this asset the same as one of the local addresses?
+bool is_this_me (fty_proto_t *asset)
+{
+    const char *operation = fty_proto_operation (asset);
+    bool found = false;
+    if (streq (operation, FTY_PROTO_ASSET_OP_CREATE) ||
+        streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
+        //are we creating/updating a rack controller?
+        const char *type = fty_proto_aux_string (asset, "type", "");
+        const char *subtype = fty_proto_aux_string (asset, "subtype", "");
+        if (streq (type, "device") || streq (subtype, "rackcontroller")) {
+            auto ifaces = s_local_addresses ();
+            zhash_t *ext = fty_proto_ext (asset);
+
+            int ipv6_index = 1;
+            found = false;
+            while (true) {
+                void *ip = zhash_lookup (ext, ("ipv6." + std::to_string (ipv6_index)).c_str ());
+                ipv6_index++;
+                if (ip != NULL) {
+                    for (auto &iface : ifaces) {
+                        if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                            found = true;
+                            //try another network interface only if match was not found
+                            break;
+                        }
+                    }
+                    // try another address only if match was not found
+                    if (found)
+                        break;
+                }
+                // no other IPv6 address on the investigated asset
+                else
+                    break;
+            }
+
+            found = false;
+            int ipv4_index = 1;
+            while (true) {
+                void *ip = zhash_lookup (ext, ("ip." + std::to_string (ipv4_index)).c_str ());
+                ipv4_index++;
+                if (ip != NULL) {
+                    for (auto &iface : ifaces) {
+                        if (iface.second.find ((char *)ip) != iface.second.end ()) {
+                            found = true;
+                            //try another network interface only if match was not found
+                            break;
+                        }
+                    }
+                    // try another address only if match was not found
+                    if (found)
+                        break;
+                }
+                // no other IPv4 address on the investigated asset
+                else
+                    break;
+            }
+        }
+    }
+    return found;
+}
 
 //  --------------------------------------------------------------------------
 //  Create a new topologyresolver
