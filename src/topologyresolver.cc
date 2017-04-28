@@ -189,7 +189,7 @@ topologyresolver_destroy (topologyresolver_t **self_p)
 void
 topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 {
-    if (! message) return;
+    if (! self || ! message) return;
     if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
 
     if (!self->iname && is_this_me (message)) {
@@ -255,15 +255,10 @@ topologyresolver_to_list (topologyresolver_t *self)
     zlistx_set_destructor (list, (void (*)(void**))zstr_free);
     zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
 
-    fty_proto_t *msg;
-    if (self->iname) {
-        msg = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (!msg)
-            return list;
-    }
-    else
+    if (!self || !self->iname) return list;
+    fty_proto_t *msg = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+    if (!msg)
         return list;
-
 
     char buffer[16]; // strlen ("parent_name.123") + 1
     for (int i=1; i<100; i++) {
@@ -286,5 +281,11 @@ void
 topologyresolver_test (bool verbose)
 {
     printf (" * topologyresolver_test: ");
+    topologyresolver_t *resolver = topologyresolver_new ("me");
+    fty_proto_t *msg = fty_proto_new (FTY_PROTO_ASSET);
+    fty_proto_set_name (msg, "parent");
+
+    fty_proto_destroy(&msg);
+    topologyresolver_destroy (&resolver);
     printf ("OK\n");
 }
