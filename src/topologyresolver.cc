@@ -215,5 +215,24 @@ topologyresolver_to_list (topologyresolver_t *self)
     zlistx_set_destructor (list, (void (*)(void**))zstr_free);
     zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
 
+    // TODO: replace with zhash lookup one whoami is done
+    fty_proto_t *msg = fty_proto_new(FTY_PROTO_ASSET);
+
+    char buffer[16]; // strlen ("parent_name.123") + 1
+    for (int i=1; i<100; i++) {
+        snprintf (buffer, 16, "parent_name.%i", i);
+        const char *parent = fty_proto_aux_string (msg, buffer, NULL);
+        if (! parent) break;
+        if (! zhashx_lookup (self->assets, parent)) {
+            // parent is unknown, topology is not complete
+            zlistx_purge (list);
+            break;
+        } else {
+            zlistx_add_end (list, (void *)parent);
+        }
+    }
+
+    // TODO: remove when lookup is done
+    fty_proto_destroy (&msg);
     return list;
 }
