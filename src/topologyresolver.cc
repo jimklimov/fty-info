@@ -192,11 +192,47 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 }
 
 //  --------------------------------------------------------------------------
-//  Return topology as string of friedly names (or NULL if incomplete)
+//  Return topology as string of friendly names (or NULL if incomplete)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
-    return "NA";
+    int size = 0;
+    char *topology = NULL;
+    zlistx_t *parents = topologyresolver_to_list (self);
+    char *next = (char *) zlistx_first (parents);
+    if (!next) {
+        zlistx_destroy (&parents);
+        return "NA";
+    }
+    else {
+        char *last = (char *) zlistx_last (parents);
+        while (next && (!streq (next,last))) {
+            size += strlen (next);
+            zstr_free (&next);
+            size += strlen (separator);
+            next = (char *) zlistx_next (parents);
+        }
+        zstr_free (&next);
+        topology = (char *) calloc (sizeof (char), size + strlen(last) + 1);
+
+        next = (char *) zlistx_first (parents);
+        while (next && (!streq (next, last))) {
+            strncpy (topology, next, strlen (next));
+            topology += strlen (next);
+            zstr_free (&next);
+            strncpy (topology, separator, strlen (separator));
+            topology += strlen (separator);
+            next = (char *) zlistx_next (parents);
+        }
+        zstr_free (&next);
+        strncpy (topology, last, strlen (last));
+        topology += strlen (last);
+        zstr_free (&last);
+        zlistx_destroy (&parents);
+        topology = '\0';
+        topology -= size + 1;
+        return (const char *) topology;
+    }
 }
 
 //  --------------------------------------------------------------------------
