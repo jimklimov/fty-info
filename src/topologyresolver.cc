@@ -216,11 +216,9 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         char *last = (char *) zlistx_last (parents);
         while (next && (!streq (next,last))) {
             size += strlen (next);
-            zstr_free (&next);
             size += strlen (separator);
             next = (char *) zlistx_next (parents);
         }
-        zstr_free (&next);
         self->topology = (char *) calloc (sizeof (char), size + strlen(last) + 1);
 
         char *topology = self->topology;
@@ -228,15 +226,12 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         while (next && (!streq (next, last))) {
             strncpy (topology, next, strlen (next));
             topology += strlen (next);
-            zstr_free (&next);
             strncpy (topology, separator, strlen (separator));
             topology += strlen (separator);
             next = (char *) zlistx_next (parents);
         }
-        zstr_free (&next);
         strncpy (topology, last, strlen (last));
         topology += strlen (last);
-        zstr_free (&last);
         zlistx_destroy (&parents);
         topology = '\0';
         return (const char *) self->topology;
@@ -261,6 +256,7 @@ topologyresolver_to_list (topologyresolver_t *self)
         return list;
 
     char buffer[16]; // strlen ("parent_name.123") + 1
+
     for (int i=1; i<100; i++) {
         snprintf (buffer, 16, "parent_name.%i", i);
         const char *parent = fty_proto_aux_string (msg, buffer, NULL);
@@ -283,8 +279,42 @@ topologyresolver_test (bool verbose)
     printf (" * topologyresolver_test: ");
     topologyresolver_t *resolver = topologyresolver_new ("me");
     fty_proto_t *msg = fty_proto_new (FTY_PROTO_ASSET);
-    fty_proto_set_name (msg, "parent");
+    fty_proto_set_name (msg, "grandparent");
+    zhash_t *ext = zhash_new ();
+    zhash_autofree (ext);
+    zhash_update (ext, "name", (void *)"my nice grandparent");
+    fty_proto_set_ext (msg, &ext);
 
+    fty_proto_t *msg2 = fty_proto_new (FTY_PROTO_ASSET);
+    fty_proto_set_name (msg2, "me");
+    ext = zhash_new ();
+    zhash_autofree (ext);
+    zhash_update (ext, "name", (void *)"this is me");
+    fty_proto_set_ext (msg, &ext);
+    zhash_t *aux = zhash_new ();
+    zhash_autofree (aux);
+    zhash_update (aux, "parent_name.1", (void *)"parent");
+    fty_proto_set_aux (msg2, &aux);
+
+    fty_proto_t *msg3 = fty_proto_new (FTY_PROTO_ASSET);
+    fty_proto_set_name (msg3, "parent");
+    ext = zhash_new ();
+    zhash_autofree (ext);
+    zhash_update (ext, "name", (void *)"this is father");
+    fty_proto_set_ext (msg3, &ext);
+    aux = zhash_new ();
+    zhash_autofree (aux);
+    zhash_update (aux, "parent_name.1", (void *)"grandparent");
+    fty_proto_set_aux (msg3, &aux);
+
+    assert ( streq (topologyresolver_to_string (resolver), "NA"));
+    topologyresolver_asset (resolver, msg);
+    topologyresolver_asset (resolver, msg2);
+    assert ( streq (topologyresolver_to_string (resolver), "NA"));
+    topologyresolver_asset (resolver, msg3);
+    zsys_debug ("%s", topologyresolver_to_string (resolver));
+    fty_proto_destroy(&msg3);
+    fty_proto_destroy(&msg2);
     fty_proto_destroy(&msg);
     topologyresolver_destroy (&resolver);
     printf ("OK\n");
