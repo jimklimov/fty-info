@@ -200,6 +200,59 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 }
 
 //  --------------------------------------------------------------------------
+// Return URI of asset for this topologyresolver
+FTY_INFO_PRIVATE const char *
+    topologyresolver_to_name_uri (topologyresolver_t *self)
+{
+    if (self->iname) {
+        std::string asset("/asset/");
+        return (asset + self->iname).c_str ();
+    }
+    else
+        return "NA";
+}
+
+//  --------------------------------------------------------------------------
+//  Return URI of the asset's parent
+const char *
+topologyresolver_to_parent_uri (topologyresolver_t *self)
+{
+    if (self->iname) {
+        fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+        if (rc_message) {
+            const char *parent_uri = fty_proto_aux_string (rc_message, "parent", "NA");
+            if (!streq (parent_uri, "NA")) {
+                std::string asset("/asset/");
+                return (asset + parent_uri).c_str ();
+            }
+            else
+                return "NA";
+        }
+        else
+            return "NA";
+    }
+    else
+        return "NA";
+}
+
+
+//  --------------------------------------------------------------------------
+//  Return user-friendly name of the asset
+const char *
+topologyresolver_to_name (topologyresolver_t *self)
+{
+    if (self->iname) {
+        fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+        if (rc_message)
+            return fty_proto_ext_string (rc_message, "name", "NA");
+        else
+            return "NA";
+    }
+    else
+        return "NA";
+}
+
+//  --------------------------------------------------------------------------
 //  Return topology as string of friendly names (or NULL if incomplete)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)

@@ -37,7 +37,7 @@
 #define INFO_SERIAL    "serial"
 #define INFO_MODEL     "model"
 #define INFO_LOCATION  "location"
-#define INFO_LOCATION_URI  "location-uri"
+#define INFO_PARENT_URI  "parent-uri"
 #define INFO_VERSION   "version"
 #define INFO_REST_PATH "path"
 #define INFO_REST_PORT "port"
