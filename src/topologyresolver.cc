@@ -188,7 +188,11 @@ topologyresolver_destroy (topologyresolver_t **self_p)
 void
 topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 {
+    if (! message) return;
+    if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
 
+    const char *iname = fty_proto_name (message);
+    zhashx_update (self->assets, iname, message);
 }
 
 //  --------------------------------------------------------------------------
@@ -235,11 +239,36 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
     }
 }
 
+
+
 //  --------------------------------------------------------------------------
 //  Return zlist of inames starting with asset up to DC
 //  Empty list is returned if the topology is incomplete yet
 zlistx_t *
 topologyresolver_to_list (topologyresolver_t *self)
 {
-    return zlistx_new();
+    zlistx_t *list = zlistx_new();
+    zlistx_set_destructor (list, (void (*)(void**))zstr_free);
+    zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
+
+    // TODO: replace with zhash lookup one whoami is done
+    fty_proto_t *msg = fty_proto_new(FTY_PROTO_ASSET);
+
+    char buffer[16]; // strlen ("parent_name.123") + 1
+    for (int i=1; i<100; i++) {
+        snprintf (buffer, 16, "parent_name.%i", i);
+        const char *parent = fty_proto_aux_string (msg, buffer, NULL);
+        if (! parent) break;
+        if (! zhashx_lookup (self->assets, parent)) {
+            // parent is unknown, topology is not complete
+            zlistx_purge (list);
+            break;
+        } else {
+            zlistx_add_end (list, (void *)parent);
+        }
+    }
+
+    // TODO: remove when lookup is done
+    fty_proto_destroy (&msg);
+    return list;
 }
