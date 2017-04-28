@@ -97,7 +97,7 @@ struct _fty_info_server_t {
     bool first_announce;
     bool announce_test;
     fty_proto_t* rc_message;
-    fty_proto_t* parent_message;
+    zhashx_t* assets;
 };
 
 //  --------------------------------------------------------------------------
@@ -115,6 +115,7 @@ info_server_new (char *name)
     self->verbose=false;
     self->first_announce=true;
     self->announce_test=false;
+    self->assets = zhashx_new ();
     return self;
 }
 //  --------------------------------------------------------------------------
@@ -135,8 +136,8 @@ info_server_destroy (fty_info_server_t  **self_p)
             zstr_free(&self->endpoint);
         if(self->rc_message)
             fty_proto_destroy (&self->rc_message);
-        if(self->parent_message)
-            fty_proto_destroy (&self->parent_message);
+        if(self->assets)
+            zhashx_destroy (&self->assets);
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -221,10 +222,10 @@ s_get_release_details
 
 //return IPC (uuid first 8 digits)
 // the returned buffer should be freed
-static 
+static
 char *s_get_name(const char *name, const char *uuid)
 {
-    
+
     char *buffer = (char*)malloc(strlen(name)+12);
     char first_digit[9];
     strncpy ( first_digit, uuid, 8 );
@@ -257,7 +258,7 @@ fty_info_test_new (void)
 }
 
 fty_info_t*
-fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
+fty_info_new (fty_proto_t *rc_message, zhashx_t *assets)
 {
     fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
     self->infos = zhash_new();
@@ -291,9 +292,35 @@ fty_info_new (fty_proto_t *rc_message, fty_proto_t *parent_message)
         self->name_uri = strdup ("NA");
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
-    //set location (parent)
-    if (parent_message != NULL)
-        self->location  = strdup (fty_proto_ext_string (parent_message, "name", "NA"));
+    //set location
+    if (rc_message != NULL) {
+        fty_proto_t *rack_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (rc_message, "parent", ""));
+        if (rack_message != NULL) {
+            fty_proto_t *row_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (rack_message, "parent", ""));
+            if (row_message != NULL) {
+                fty_proto_t *room_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (row_message, "parent", ""));
+                if (room_message != NULL) {
+                    fty_proto_t *dc_message = (fty_proto_t*) zhashx_lookup (assets, fty_proto_aux_string (room_message, "parent", ""));
+                    if (dc_message != NULL) {
+                        std::string delimiter(">");
+                        self->location = strdup ((fty_proto_ext_string (dc_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (room_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (row_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (rack_message, "name", "") + delimiter +
+                                        fty_proto_ext_string (rc_message, "name", "")).c_str ());
+                    }
+                    else
+                        self->location  = strdup ("NA");
+                }
+                else
+                    self->location  = strdup ("NA");
+            }
+            else
+                self->location  = strdup ("NA");
+        }
+        else
+            self->location  = strdup ("NA");
+    }
     else
         self->location  = strdup ("NA");
     zsys_info ("fty-info:location  = '%s'", self->location);
@@ -402,7 +429,7 @@ s_publish_announce(fty_info_server_t  * self)
         return;
     fty_info_t *info;
     if (!self->announce_test) {
-        info = fty_info_new (self->rc_message, self->parent_message);
+        info = fty_info_new (self->rc_message, self->assets);
     }
     else
         info = fty_info_test_new ();
@@ -530,6 +557,15 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     return true;
 }
 
+//  fty message freefn prototype
+
+void fty_msg_free_fn(void *data)
+{
+    if (!data) return;
+    fty_proto_t *msg = (fty_proto_t *)data;
+    fty_proto_destroy (&msg);
+}
+
 //  --------------------------------------------------------------------------
 //  process message from FTY_PROTO_ASSET stream
 void static
@@ -616,14 +652,9 @@ s_handle_stream(fty_info_server_t* self,zmsg_t *message)
             }
         }
         const char *name = fty_proto_name (bmessage);
-        if (self->rc_message != NULL && streq (name, fty_proto_aux_string (self->rc_message, "parent", ""))) {
-            // save parent message, because it contains ext name for location
-            if (self->parent_message)
-                fty_proto_destroy (&(self->parent_message));
-            self->parent_message = fty_proto_dup (bmessage);
-            found=true;
-        }
-        if(found)
+        zhashx_update (self->assets, name, fty_proto_dup (bmessage));
+        zhashx_freefn (self->assets, name, fty_msg_free_fn);
+        if (found)
             s_publish_announce(self);
     }
 
@@ -677,7 +708,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         char *zuuid = zmsg_popstr (message);
         fty_info_t *info;
         if (streq(command, "INFO")) {
-            info = fty_info_new (self->rc_message, self->parent_message);
+            info = fty_info_new (self->rc_message, self->assets);
         }
         if (streq(command, "INFO-TEST")) {
             info = fty_info_test_new ();
@@ -813,7 +844,7 @@ fty_info_server_test (bool verbose)
         zsys_debug ("fty-info-test: zmsg_size = %d",zmsg_size (recv));
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
-        
+
         char *srv_name = zmsg_popstr (recv);
         assert (srv_name && streq (srv_name,"IPC (ce7c523e)"));
         zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
@@ -893,7 +924,7 @@ fty_info_server_test (bool verbose)
         char *srv_type  = zmsg_popstr (recv);
         char *srv_stype = zmsg_popstr (recv);
         char *srv_port  = zmsg_popstr (recv);
-        
+
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
@@ -1185,8 +1216,8 @@ fty_info_server_test (bool verbose)
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
         assert(rest_root && streq (rest_root, TXT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
-        
-        
+
+
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
