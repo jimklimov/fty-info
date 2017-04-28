@@ -37,6 +37,8 @@
 void
 fty_info_private_selftest (bool verbose)
 {
+// Tests for stable private classes:
+    topologyresolver_test (verbose);
 }
 /*
 ################################################################################
