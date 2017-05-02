@@ -27,36 +27,6 @@
 */
 #define TIMEOUT_MS -1   //wait infinitelly
 
-static const char* RELEASE_DETAILS = "/etc/release-details.json";
-
-//default values
-#define SRV_NAME "IPC"
-#define SRV_TYPE "_https._tcp."
-#define SRV_STYPE "_powerservice._sub._https._tcp."
-#define SRV_PORT "443"
-#define TXT_PATH "/api/v1/comm/connections"
-#define TXT_PROTO_FORMAT "etnrs"
-#define TXT_TYPE   "ipc"
-#define TXT_VER  "1"
-//test value for INFO-TEST command reply
-#define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
-#define TST_HOSTNAME    "localhost"
-#define TST_NAME        "MyIPC"
-#define TST_INAME       "ipc-001"
-#define TST_NAME_URI    "/asset/ipc-001"
-#define TST_MODEL       "IPC3000"
-#define TST_VENDOR      "Eaton"
-#define TST_SERIAL      "LA71026006"
-#define TST_LOCATION         "Rack1"
-#define TST_PARENT_INAME   "rack-001"
-#define TST_PARENT_URI     "/asset/rack-001"
-#define TST_LOCATION2        "Rack2"
-#define TST_PARENT2_INAME  "rack-002"
-#define TST_PARENT2_URI    "/asset/rack-002"
-#define TST_VERSION     "1.0.0"
-#define TST_PATH        "/api/v1"
-#define TST_PORT        "80"
-
 #include <string>
 #include <unistd.h>
 #include <bits/local_lim.h>
@@ -68,24 +38,6 @@ static const char* RELEASE_DETAILS = "/etc/release-details.json";
 #include <ifaddrs.h>
 
 #include "fty_info_classes.h"
-
-struct _fty_info_t {
-    zhash_t *infos;
-    char *uuid;
-    char *hostname;
-    char *name;
-    char *name_uri;
-    char *model;
-    char *vendor;
-    char *serial;
-    char *location;
-    char *parent_uri;
-    char *version;
-    char *path;
-    char *protocol_format;
-    char *type;
-    char *txtvers;
-};
 
 struct _fty_info_server_t {
     //  Declare class properties here
@@ -137,40 +89,6 @@ info_server_destroy (fty_info_server_t  **self_p)
     }
 }
 
-static cxxtools::SerializationInfo*
-s_load_release_details()
-{
-    cxxtools::SerializationInfo *si = new cxxtools::SerializationInfo();
-    try {
-        std::ifstream f(RELEASE_DETAILS);
-        std::string json_string (std::istreambuf_iterator<char>(f), {});
-        std::stringstream s(json_string);
-        cxxtools::JsonDeserializer json(s);
-        json.deserialize (*si);
-        zsys_info("fty-info:load %s OK",RELEASE_DETAILS);
-    }
-    catch (const std::exception& e) {
-        zsys_error ("Error while parsing JSON: %s", e.what ());
-    }
-    return si;
-}
-
-
-static char*
-s_get_release_details
-    (cxxtools::SerializationInfo *si,
-     const char *key,
-     const char * dfl)
-{
-    std::string value = dfl;
-    try {
-        si->getMember("release-details").getMember(key) >>= value;
-    }
-    catch (const std::exception& e) {
-        zsys_error ("Error while getting %s in JSON: %s", key, e.what ());
-    }
-    return strdup(value.c_str());
-}
 
 //return IPC (uuid first 8 digits)
 // the returned buffer should be freed
@@ -184,126 +102,6 @@ char *s_get_name(const char *name, const char *uuid)
     first_digit[8]='\0';
     sprintf(buffer, "%s (%s)",name,first_digit);
     return buffer;
-}
-
-fty_info_t*
-fty_info_test_new (void)
-{
-    fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
-    // TXT attributes
-    self->infos     = zhash_new();
-    self->uuid      = strdup (TST_UUID);
-    self->hostname  = strdup (TST_HOSTNAME);
-    self->name      = strdup (TST_NAME);
-    self->name_uri  = strdup (TST_NAME_URI);
-    self->model     = strdup (TST_MODEL);
-    self->vendor    = strdup (TST_VENDOR);
-    self->serial    = strdup (TST_SERIAL);
-    self->location  = strdup (TST_LOCATION);
-    self->parent_uri  = strdup (TST_PARENT_URI);
-    self->version   = strdup (TST_VERSION);
-    self->path      = strdup (TXT_PATH);
-    self->protocol_format = strdup (TXT_PROTO_FORMAT);
-    self->type      = strdup (TXT_TYPE);
-    self->txtvers   = strdup (TXT_VER);
-    return self;
-}
-
-fty_info_t*
-fty_info_new (topologyresolver_t *resolver)
-{
-    fty_info_t *self = (fty_info_t *) zmalloc (sizeof (fty_info_t));
-    self->infos = zhash_new();
-
-    // set hostname
-    char *hostname = (char *) malloc (HOST_NAME_MAX+1);
-    int rv = gethostname (hostname, HOST_NAME_MAX+1);
-    if (rv == -1) {
-        zsys_warning ("fty_info could not be fully initialized (error while getting the hostname)");
-        self->hostname = strdup("locahost");
-    }
-    else {
-        self->hostname = strdup (hostname);
-    }
-    zstr_free (&hostname);
-    zsys_info ("fty-info:hostname  = '%s'", self->hostname);
-
-    //set name
-    self->name = strdup (topologyresolver_to_name (resolver));
-    zsys_info ("fty-info:name      = '%s'", self-> name);
-
-    //set name_uri
-    self->name_uri = strdup (topologyresolver_to_name_uri (resolver));
-    zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
-
-    //set location
-    self->location = strdup (topologyresolver_to_string (resolver, ">"));
-    zsys_info ("fty-info:location  = '%s'", self->location);
-
-    //set parent_uri
-    self->parent_uri = strdup (topologyresolver_to_parent_uri (resolver));
-    zsys_info ("fty-info:location_uri  = '%s'", self->parent_uri);
-
-    //set uuid, vendor, model from /etc/release-details.json
-    cxxtools::SerializationInfo *si = nullptr;
-    si = s_load_release_details();
-    self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
-    self->vendor = s_get_release_details (si, "hardware-vendor", "NA");
-    self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
-    self->model  = s_get_release_details (si, "hardware-catalog-number", "NA");
-    zsys_info ("fty-info:uuid      = '%s'", self->uuid);
-    zsys_info ("fty-info:vendor    = '%s'", self->vendor);
-    zsys_info ("fty-info:serial    = '%s'", self->serial);
-    zsys_info ("fty-info:model     = '%s'", self->model);
-
-
-    // TODO: set version
-    self->version   = strdup ("NotImplemented");
-    // use default
-    self->path = strdup (TXT_PATH);
-    self->protocol_format = strdup (TXT_PROTO_FORMAT);
-    self->type = strdup (TXT_TYPE);
-    self->txtvers   = strdup (TXT_VER);
-    zsys_info ("fty-info:version = '%s'", self->version);
-    zsys_info ("fty-info:path = '%s'", self->path);
-    zsys_info ("fty-info:protocol_format = '%s'", self->protocol_format);
-    zsys_info ("fty-info:type = '%s'", self->type);
-    zsys_info ("fty-info:txtvers = '%s'", self->txtvers);
-
-    if(si)
-        delete si;
-
-    return self;
-}
-
-void
-fty_info_destroy (fty_info_t ** self_ptr)
-{
-    if (!self_ptr)
-        return;
-    if (*self_ptr) {
-        fty_info_t *self = *self_ptr;
-        // Free class properties here
-        zhash_destroy(&self->infos);
-        zstr_free (&self->uuid);
-        zstr_free (&self->hostname);
-        zstr_free (&self->name);
-        zstr_free (&self->name_uri);
-        zstr_free (&self->model);
-        zstr_free (&self->vendor);
-        zstr_free (&self->serial);
-        zstr_free (&self->location);
-        zstr_free (&self->parent_uri);
-        zstr_free (&self->version);
-        zstr_free (&self->path);
-        zstr_free (&self->protocol_format);
-        zstr_free (&self->type);
-        zstr_free (&self->txtvers);
-        // Free object itself
-        free (self);
-        *self_ptr = NULL;
-    }
-
 }
 
 //  --------------------------------------------------------------------------
@@ -332,39 +130,22 @@ s_publish_announce(fty_info_server_t  * self)
 
     if(!mlm_client_connected(self->announce_client))
         return;
-    fty_info_t *info;
+    ftyinfo_t *info;
     if (!self->announce_test) {
-        info = fty_info_new (self->resolver);
+        info = ftyinfo_new (self->resolver);
     }
     else
-        info = fty_info_test_new ();
+        info = ftyinfo_test_new ();
 
     //prepare  msg content
     zmsg_t *msg=zmsg_new();
-    char *srv_name = s_get_name(SRV_NAME, info->uuid);
+    char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
     zmsg_addstr (msg, srv_name);
     zmsg_addstr (msg, SRV_TYPE);
     zmsg_addstr (msg, SRV_STYPE);
     zmsg_addstr (msg, SRV_PORT);
 
-    zhash_t *map = zhash_new ();
-    zhash_autofree (map);
-    zhash_insert(map, INFO_UUID, info->uuid);
-    zhash_insert(map, INFO_HOSTNAME, info->hostname);
-    zhash_insert(map, INFO_NAME, info->name);
-    zhash_insert(map, INFO_NAME_URI, info->name_uri);
-    zhash_insert(map, INFO_VENDOR, info->vendor);
-    zhash_insert(map, INFO_VENDOR, info->vendor);
-    zhash_insert(map, INFO_MODEL, info->model);
-    zhash_insert(map, INFO_SERIAL, info->serial);
-    zhash_insert(map, INFO_LOCATION, info->location);
-    zhash_insert(map, INFO_PARENT_URI, info->parent_uri);
-    zhash_insert(map, INFO_VERSION, info->version);
-    zhash_insert(map, INFO_REST_PATH, info->path);
-    zhash_insert(map, INFO_PROTOCOL_FORMAT, info->protocol_format);
-    zhash_insert(map, INFO_TYPE, info->type);
-    zhash_insert(map, INFO_TXTVERS, info->txtvers);
-
+    zhash_t *map = ftyinfo_infohash (info);
     zframe_t * frame_infos = zhash_pack(map);
     zmsg_append (msg, &frame_infos);
     if (self->first_announce) {
@@ -382,8 +163,7 @@ s_publish_announce(fty_info_server_t  * self)
     }
     zstr_free(&srv_name);
     zframe_destroy(&frame_infos);
-    zhash_destroy (&map);
-    fty_info_destroy (&info);
+    ftyinfo_destroy (&info);
 }
 //  --------------------------------------------------------------------------
 //  process pipe message
@@ -542,42 +322,28 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         zsys_debug ("fty-info:do '%s'", command);
         zmsg_t *reply = zmsg_new ();
         char *zuuid = zmsg_popstr (message);
-        fty_info_t *info;
+        ftyinfo_t *info;
         if (streq(command, "INFO")) {
-            info = fty_info_new (self->resolver);
+            info = ftyinfo_new (self->resolver);
         }
         if (streq(command, "INFO-TEST")) {
-            info = fty_info_test_new ();
+            info = ftyinfo_test_new ();
         }
         //prepare replied msg content
         zmsg_addstrf (reply, "%s", zuuid);
-        char *srv_name = s_get_name(SRV_NAME, info->uuid);
+        char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid (info));
         zmsg_addstr (reply, srv_name);
         zmsg_addstr (reply, SRV_TYPE);
         zmsg_addstr (reply, SRV_STYPE);
         zmsg_addstr (reply, SRV_PORT);
-        zhash_insert(info->infos, INFO_UUID, info->uuid);
-        zhash_insert(info->infos, INFO_HOSTNAME, info->hostname);
-        zhash_insert(info->infos, INFO_NAME, info->name);
-        zhash_insert(info->infos, INFO_NAME_URI, info->name_uri);
-        zhash_insert(info->infos, INFO_VENDOR, info->vendor);
-        zhash_insert(info->infos, INFO_MODEL, info->model);
-        zhash_insert(info->infos, INFO_SERIAL, info->serial);
-        zhash_insert(info->infos, INFO_LOCATION, info->location);
-        zhash_insert(info->infos, INFO_PARENT_URI, info->parent_uri);
-        zhash_insert(info->infos, INFO_VERSION, info->version);
-        zhash_insert(info->infos, INFO_REST_PATH, info->path);
-        zhash_insert(info->infos, INFO_PROTOCOL_FORMAT, info->protocol_format);
-        zhash_insert(info->infos, INFO_TYPE, info->type);
-        zhash_insert(info->infos, INFO_TXTVERS, info->txtvers);
 
-        zframe_t * frame_infos = zhash_pack(info->infos);
+        zframe_t * frame_infos = zhash_pack(ftyinfo_infohash (info));
         zmsg_append (reply, &frame_infos);
         mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
         zframe_destroy(&frame_infos);
         zstr_free (&zuuid);
         zstr_free(&srv_name);
-        fty_info_destroy (&info);
+        ftyinfo_destroy (&info);
     }
     zstr_free (&command);
     zmsg_destroy (&message);

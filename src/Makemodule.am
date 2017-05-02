@@ -23,6 +23,7 @@ include_HEADERS += \
 endif
 src_libfty_info_la_SOURCES = \
     src/topologyresolver.cc \
+    src/ftyinfo.cc \
     src/platform.h
 
 if ENABLE_DRAFTS
