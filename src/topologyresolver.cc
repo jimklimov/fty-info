@@ -42,7 +42,7 @@ typedef enum {
 struct _topologyresolver_t {
     char *iname;
     char *topology;
-    int state;
+    ResolverState state;
     zhashx_t *assets;
 };
 
@@ -150,6 +150,34 @@ static bool s_is_this_me (fty_proto_t *asset)
     return found;
 }
 
+static void
+s_purge_message_cache (topologyresolver_t *self, zlistx_t *parents)
+{
+    if (!self || !self->assets)
+        return;
+
+    zhashx_t *purged_assets = zhashx_new ();
+    zhashx_set_destructor (purged_assets, (czmq_destructor *) fty_proto_destroy);
+    zhashx_set_duplicator (purged_assets, (czmq_duplicator *) fty_proto_dup);
+
+    fty_proto_t *msg = (fty_proto_t *) zhashx_first (self->assets);
+    while (msg != NULL )  {
+        char *key = (char *) zhashx_cursor (self->assets);
+        const char *tmp = (const char *) zlistx_find (parents, key);
+        if (tmp) {
+            zhashx_update (purged_assets, key, msg);
+        }
+        msg = (fty_proto_t *) zhashx_next (self->assets);
+    }
+
+    fty_proto_t *rc_msg = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+    zhashx_update (purged_assets, self->iname, rc_msg);
+
+    zhashx_purge (self->assets);
+    zhashx_destroy (&self->assets);
+    self->assets = purged_assets;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new topologyresolver
 
@@ -160,6 +188,7 @@ topologyresolver_new (const char *iname)
     assert (self);
     //  Initialize class properties here
     if (iname) self->iname = strdup (iname);
+    self->state = DISCOVERING;
     self->assets = zhashx_new ();
     zhashx_set_destructor (self->assets, (czmq_destructor *) fty_proto_destroy);
     zhashx_set_duplicator (self->assets, (czmq_duplicator *) fty_proto_dup);
@@ -198,6 +227,13 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
         self->iname = strdup (fty_proto_name (message));
     }
     const char *iname = fty_proto_name (message);
+
+    if (self->state == UPTODATE) {
+        fty_proto_t *iname_msg = (fty_proto_t *) zhashx_lookup (self->assets, iname);
+        // we received a message about asset in our topology, trigger recomputation
+        if (iname_msg)
+            self->state = DISCOVERING;
+    }
     zhashx_update (self->assets, iname, message);
 }
 
@@ -256,35 +292,39 @@ topologyresolver_to_name (topologyresolver_t *self)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
-    zlistx_t *parents = topologyresolver_to_list (self);
-    char *next = (char *) zlistx_first (parents);
-    if (!next) {
-        zlistx_destroy (&parents);
-        return "NA";
-    }
+    if (self && self->state == UPTODATE)
+        return self->topology;
     else {
-        zstr_free (&self->topology);
-        self->topology = strdup ("");
-        char *iname = (char *) zlistx_first (parents);
-        while (iname) {
-            fty_proto_t *msg = (fty_proto_t *) zhashx_lookup (self->assets, iname);
-            if (msg) {
-                const char *ename = fty_proto_ext_string (msg, "name", iname);
-                char *tmp = zsys_sprintf ("%s%s%s", self->topology, ename, separator);
-                if (tmp) {
-                    zstr_free (&self->topology);
-                    self->topology = tmp;
+        zlistx_t *parents = topologyresolver_to_list (self);
+
+        if (self && self->state == UPTODATE) {
+            zstr_free (&self->topology);
+            self->topology = strdup ("");
+            char *iname = (char *) zlistx_first (parents);
+            while (iname) {
+                fty_proto_t *msg = (fty_proto_t *) zhashx_lookup (self->assets, iname);
+                if (msg) {
+                    const char *ename = fty_proto_ext_string (msg, "name", ""/*iname*/);
+                    char *tmp = zsys_sprintf ("%s%s%s", self->topology, ename, separator);
+                    if (tmp) {
+                        zstr_free (&self->topology);
+                        self->topology = tmp;
+                    }
                 }
+                iname = (char *) zlistx_next (parents);
+            };
+            if (strlen (self->topology) >= strlen (separator)) {
+                // remove trailing separator
+                char *p = &self->topology [strlen (self->topology) - strlen (separator)];
+                *p = 0;
             }
-            iname = (char *) zlistx_next (parents);
-        };
-        if (strlen (self->topology) >= strlen (separator)) {
-            // remove trailing separator
-            char *p = &self->topology [strlen (self->topology) - strlen (separator)];
-            *p = 0;
+            zlistx_destroy (&parents);
+            return (const char *) self->topology;
         }
-        zlistx_destroy (&parents);
-        return (const char *) self->topology;
+        else {
+            zlistx_destroy (&parents);
+            return "NA";
+        }
     }
 }
 
@@ -299,6 +339,7 @@ topologyresolver_to_list (topologyresolver_t *self)
     zlistx_t *list = zlistx_new();
     zlistx_set_destructor (list, (void (*)(void**))zstr_free);
     zlistx_set_duplicator (list, (void* (*)(const void*))strdup);
+    zlistx_set_comparator (list, (int (*)(const void *,const void *))strcmp);
 
     if (!self || !self->iname) return list;
     fty_proto_t *msg = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
@@ -320,6 +361,10 @@ topologyresolver_to_list (topologyresolver_t *self)
         }
     }
 
+    if (zlistx_first (list)) {
+        self->state = UPTODATE;
+        s_purge_message_cache (self, list);
+    }
     return list;
 }
 
