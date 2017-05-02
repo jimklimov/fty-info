@@ -27,6 +27,8 @@
 */
 
 #include "fty_info_classes.h"
+#include <map>
+#include <set>
 
 // State
 
@@ -257,7 +259,6 @@ topologyresolver_to_name (topologyresolver_t *self)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
-    int size = 0;
     zlistx_t *parents = topologyresolver_to_list (self);
     char *next = (char *) zlistx_first (parents);
     if (!next) {
@@ -266,27 +267,26 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
     }
     else {
         zstr_free (&self->topology);
-        char *last = (char *) zlistx_last (parents);
-        while (next && (!streq (next,last))) {
-            size += strlen (next);
-            size += strlen (separator);
-            next = (char *) zlistx_next (parents);
+        self->topology = strdup ("");
+        char *iname = (char *) zlistx_first (parents);
+        while (iname) {
+            fty_proto_t *msg = (fty_proto_t *) zhashx_lookup (self->assets, iname);
+            if (msg) {
+                const char *ename = fty_proto_ext_string (msg, "name", iname);
+                char *tmp = zsys_sprintf ("%s%s%s", self->topology, ename, separator);
+                if (tmp) {
+                    zstr_free (&self->topology);
+                    self->topology = tmp;
+                }
+            }
+            iname = (char *) zlistx_next (parents);
+        };
+        if (strlen (self->topology) >= strlen (separator)) {
+            // remove trailing separator
+            char *p = &self->topology [strlen (self->topology) - strlen (separator)];
+            *p = 0;
         }
-        self->topology = (char *) calloc (sizeof (char), size + strlen(last) + 1);
-
-        char *topology = self->topology;
-        next = (char *) zlistx_first (parents);
-        while (next && (!streq (next, last))) {
-            strncpy (topology, next, strlen (next));
-            topology += strlen (next);
-            strncpy (topology, separator, strlen (separator));
-            topology += strlen (separator);
-            next = (char *) zlistx_next (parents);
-        }
-        strncpy (topology, last, strlen (last));
-        topology += strlen (last);
         zlistx_destroy (&parents);
-        topology = '\0';
         return (const char *) self->topology;
     }
 }
@@ -343,10 +343,11 @@ topologyresolver_test (bool verbose)
     ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"this is me");
-    fty_proto_set_ext (msg, &ext);
+    fty_proto_set_ext (msg2, &ext);
     zhash_t *aux = zhash_new ();
     zhash_autofree (aux);
     zhash_update (aux, "parent_name.1", (void *)"parent");
+    zhash_update (aux, "parent_name.2", (void *)"grandparent");
     fty_proto_set_aux (msg2, &aux);
 
     fty_proto_t *msg3 = fty_proto_new (FTY_PROTO_ASSET);
@@ -360,12 +361,12 @@ topologyresolver_test (bool verbose)
     zhash_update (aux, "parent_name.1", (void *)"grandparent");
     fty_proto_set_aux (msg3, &aux);
 
-    assert ( streq (topologyresolver_to_string (resolver), "NA"));
+    assert (streq (topologyresolver_to_string (resolver), "NA"));
     topologyresolver_asset (resolver, msg);
     topologyresolver_asset (resolver, msg2);
-    assert ( streq (topologyresolver_to_string (resolver), "NA"));
+    assert (streq (topologyresolver_to_string (resolver), "NA"));
     topologyresolver_asset (resolver, msg3);
-    zsys_debug ("%s", topologyresolver_to_string (resolver));
+    assert (streq ("my nice grandparent->this is father", topologyresolver_to_string (resolver, "->")));
     fty_proto_destroy(&msg3);
     fty_proto_destroy(&msg2);
     fty_proto_destroy(&msg);
