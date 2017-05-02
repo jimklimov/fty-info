@@ -36,7 +36,7 @@ FTY_INFO_PRIVATE void
     topologyresolver_destroy (topologyresolver_t **self_p);
 
 // Return URI of asset for this topologyresolver
-FTY_INFO_PRIVATE const char *
+FTY_INFO_PRIVATE char *
     topologyresolver_to_name_uri (topologyresolver_t *self);
 
 //  Give topology resolver one asset information
@@ -44,7 +44,7 @@ FTY_INFO_PRIVATE void
     topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message);
 
 //  Return URI of the asset's parent
-FTY_INFO_PRIVATE const char *
+FTY_INFO_PRIVATE char *
     topologyresolver_to_parent_uri (topologyresolver_t *self);
 
 //  Return user-friendly name of the asset

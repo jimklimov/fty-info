@@ -203,38 +203,35 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 
 //  --------------------------------------------------------------------------
 // Return URI of asset for this topologyresolver
-FTY_INFO_PRIVATE const char *
+char *
     topologyresolver_to_name_uri (topologyresolver_t *self)
 {
-    if (self->iname) {
-        std::string asset("/asset/");
-        return (asset + self->iname).c_str ();
-    }
+    if (self->iname)
+        return zsys_sprintf ("/asset/%s", self->iname);
     else
-        return "NA";
+        return strdup ("NA");
 }
 
 //  --------------------------------------------------------------------------
 //  Return URI of the asset's parent
-const char *
+char *
 topologyresolver_to_parent_uri (topologyresolver_t *self)
 {
     if (self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message) {
-            const char *parent_uri = fty_proto_aux_string (rc_message, "parent", "NA");
-            if (!streq (parent_uri, "NA")) {
-                std::string asset("/asset/");
-                return (asset + parent_uri).c_str ();
+            const char *parent_iname = fty_proto_aux_string (rc_message, "parent", "NA");
+            if (!streq (parent_iname, "NA")) {
+                return zsys_sprintf ("/asset/%s", parent_iname);
             }
             else
-                return "NA";
+                return strdup ("NA");
         }
         else
-            return "NA";
+            return strdup ("NA");
     }
     else
-        return "NA";
+        return strdup ("NA");
 }
 
 
