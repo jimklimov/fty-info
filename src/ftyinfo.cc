@@ -121,7 +121,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:name      = '%s'", self-> name);
 
     //set name_uri
-    self->name_uri = strdup (topologyresolver_to_name_uri (resolver));
+    self->name_uri = topologyresolver_to_name_uri (resolver);
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
     //set location
@@ -129,7 +129,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set parent_uri
-    self->parent_uri = strdup (topologyresolver_to_parent_uri (resolver));
+    self->parent_uri = topologyresolver_to_parent_uri (resolver);
     zsys_info ("fty-info:location_uri  = '%s'", self->parent_uri);
 
     //set uuid, vendor, model from /etc/release-details.json
