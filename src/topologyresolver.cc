@@ -89,7 +89,7 @@ s_local_addresses()
 
 //check if this is our rack controller - is any IP address
 //of this asset the same as one of the local addresses?
-bool is_this_me (fty_proto_t *asset)
+static bool s_is_this_me (fty_proto_t *asset)
 {
     const char *operation = fty_proto_operation (asset);
     bool found = false;
@@ -194,7 +194,7 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
     if (! self || ! message) return;
     if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
 
-    if (!self->iname && is_this_me (message)) {
+    if (!self->iname && s_is_this_me (message)) {
         self->iname = strdup (fty_proto_name (message));
     }
     const char *iname = fty_proto_name (message);
