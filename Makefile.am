@@ -54,6 +54,7 @@ endif
 
 EXTRA_DIST += \
     src/topologyresolver.h \
+    src/ftyinfo.h \
     README.md \
     src/fty_info_classes.h
 

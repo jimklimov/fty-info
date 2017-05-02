@@ -35,19 +35,18 @@
 //  Extra headers
 
 //  Opaque class structures to allow forward references
-// NOTE: Typedef below added manually
-#ifndef FTY_INFO_T_DEFINED
-typedef struct _fty_info_t fty_info_t;
-#define FTY_INFO_T_DEFINED
-#endif
-
 #ifndef TOPOLOGYRESOLVER_T_DEFINED
 typedef struct _topologyresolver_t topologyresolver_t;
 #define TOPOLOGYRESOLVER_T_DEFINED
 #endif
+#ifndef FTYINFO_T_DEFINED
+typedef struct _ftyinfo_t ftyinfo_t;
+#define FTYINFO_T_DEFINED
+#endif
 
 //  Internal API
 #include "topologyresolver.h"
+#include "ftyinfo.h"
 
 //  *** To avoid double-definitions, only define if building without draft ***
 #ifndef FTY_INFO_BUILD_DRAFT_API
@@ -56,6 +55,11 @@ typedef struct _topologyresolver_t topologyresolver_t;
 //  Self test of this class.
 FTY_INFO_PRIVATE void
     topologyresolver_test (bool verbose);
+
+//  *** Draft method, defined for internal use only ***
+//  Self test of this class.
+FTY_INFO_PRIVATE void
+    ftyinfo_test (bool verbose);
 
 //  Self test for private classes
 FTY_INFO_PRIVATE void
