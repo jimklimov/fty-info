@@ -375,6 +375,7 @@ topologyresolver_test (bool verbose)
     topologyresolver_t *resolver = topologyresolver_new ("me");
     fty_proto_t *msg = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg, "grandparent");
+    fty_proto_set_operation (msg, FTY_PROTO_ASSET_OP_CREATE);
     zhash_t *ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"my nice grandparent");
@@ -382,6 +383,7 @@ topologyresolver_test (bool verbose)
 
     fty_proto_t *msg2 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg2, "me");
+    fty_proto_set_operation (msg2, FTY_PROTO_ASSET_OP_CREATE);
     ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"this is me");
@@ -394,6 +396,7 @@ topologyresolver_test (bool verbose)
 
     fty_proto_t *msg3 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg3, "parent");
+    fty_proto_set_operation (msg3, FTY_PROTO_ASSET_OP_CREATE);
     ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"this is father");
@@ -409,6 +412,40 @@ topologyresolver_test (bool verbose)
     assert (streq (topologyresolver_to_string (resolver), "NA"));
     topologyresolver_asset (resolver, msg3);
     assert (streq ("my nice grandparent->this is father", topologyresolver_to_string (resolver, "->")));
+
+    fty_proto_t *msg4 = fty_proto_new (FTY_PROTO_ASSET);
+    fty_proto_set_name (msg4, "me");
+    fty_proto_set_operation (msg2, FTY_PROTO_ASSET_OP_UPDATE);
+    ext = zhash_new ();
+    zhash_autofree (ext);
+    zhash_update (ext, "name", (void *)"this is me");
+    fty_proto_set_ext (msg4, &ext);
+    aux = zhash_new ();
+    zhash_autofree (aux);
+    zhash_update (aux, "parent_name.1", (void *)"newparent");
+    zhash_update (aux, "parent_name.2", (void *)"grandparent");
+    fty_proto_set_aux (msg4, &aux);
+
+    topologyresolver_asset (resolver, msg4);
+    assert (streq (topologyresolver_to_string (resolver), "NA"));
+
+    fty_proto_t *msg5 = fty_proto_new (FTY_PROTO_ASSET);
+    fty_proto_set_name (msg5, "newparent");
+    fty_proto_set_operation (msg5, FTY_PROTO_ASSET_OP_CREATE);
+    ext = zhash_new ();
+    zhash_autofree (ext);
+    zhash_update (ext, "name", (void *)"this is new father");
+    fty_proto_set_ext (msg5, &ext);
+    aux = zhash_new ();
+    zhash_autofree (aux);
+    zhash_update (aux, "parent_name.1", (void *)"grandparent");
+    fty_proto_set_aux (msg5, &aux);
+
+    topologyresolver_asset (resolver, msg5);
+    assert (streq ("my nice grandparent->this is new father", topologyresolver_to_string (resolver, "->")));
+
+    fty_proto_destroy(&msg5);
+    fty_proto_destroy(&msg4);
     fty_proto_destroy(&msg3);
     fty_proto_destroy(&msg2);
     fty_proto_destroy(&msg);
