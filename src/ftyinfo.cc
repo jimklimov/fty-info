@@ -113,19 +113,15 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
 
     //set name
-    if (resolver) {
-        self->name = strdup (topologyresolver_to_name (resolver));
-    } else {
-        self->name = strdup ("NA");
-    }
+    self->name = topologyresolver_to_rc_name (resolver);
     zsys_info ("fty-info:name      = '%s'", self-> name);
 
     //set name_uri
-    self->name_uri = topologyresolver_to_name_uri (resolver);
+    self->name_uri = topologyresolver_to_rc_name_uri (resolver);
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
     //set location
-    self->location = strdup (topologyresolver_to_string (resolver, ">"));
+    self->location = topologyresolver_to_string (resolver, ">");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set parent_uri

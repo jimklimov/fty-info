@@ -240,9 +240,9 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 //  --------------------------------------------------------------------------
 // Return URI of asset for this topologyresolver
 char *
-    topologyresolver_to_name_uri (topologyresolver_t *self)
+    topologyresolver_to_rc_name_uri (topologyresolver_t *self)
 {
-    if (self->iname)
+    if (self && self->iname)
         return zsys_sprintf ("/asset/%s", self->iname);
     else
         return strdup ("NA");
@@ -253,7 +253,7 @@ char *
 char *
 topologyresolver_to_parent_uri (topologyresolver_t *self)
 {
-    if (self->iname) {
+    if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message) {
             const char *parent_iname = fty_proto_aux_string (rc_message, "parent", "NA");
@@ -273,23 +273,23 @@ topologyresolver_to_parent_uri (topologyresolver_t *self)
 
 //  --------------------------------------------------------------------------
 //  Return user-friendly name of the asset
-const char *
-topologyresolver_to_name (topologyresolver_t *self)
+char *
+topologyresolver_to_rc_name (topologyresolver_t *self)
 {
-    if (self->iname) {
+    if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message)
-            return fty_proto_ext_string (rc_message, "name", "NA");
+            return strdup (fty_proto_ext_string (rc_message, "name", "NA"));
         else
-            return "NA";
+            return strdup ("NA");
     }
     else
-        return "NA";
+        return strdup ("NA");
 }
 
 //  --------------------------------------------------------------------------
 //  Return topology as string of friendly names (or NULL if incomplete)
-const char *
+char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
     if (self && self->state == UPTODATE)
@@ -319,11 +319,11 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
                 *p = 0;
             }
             zlistx_destroy (&parents);
-            return (const char *) self->topology;
+            return strdup (self->topology);
         }
         else {
             zlistx_destroy (&parents);
-            return "NA";
+            return strdup ("NA");
         }
     }
 }
@@ -406,12 +406,18 @@ topologyresolver_test (bool verbose)
     zhash_update (aux, "parent_name.1", (void *)"grandparent");
     fty_proto_set_aux (msg3, &aux);
 
-    assert (streq (topologyresolver_to_string (resolver), "NA"));
+    char *res = topologyresolver_to_string (resolver);
+    assert (streq (res, "NA"));
+    zstr_free (&res);
     topologyresolver_asset (resolver, msg);
     topologyresolver_asset (resolver, msg2);
-    assert (streq (topologyresolver_to_string (resolver), "NA"));
+    res = topologyresolver_to_string (resolver);
+    assert (streq (res, "NA"));
+    zstr_free (&res);
     topologyresolver_asset (resolver, msg3);
-    assert (streq ("my nice grandparent->this is father", topologyresolver_to_string (resolver, "->")));
+    res = topologyresolver_to_string (resolver, "->");
+    assert (streq ("my nice grandparent->this is father", res));
+    zstr_free (&res);
 
     fty_proto_t *msg4 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg4, "me");
@@ -427,7 +433,9 @@ topologyresolver_test (bool verbose)
     fty_proto_set_aux (msg4, &aux);
 
     topologyresolver_asset (resolver, msg4);
-    assert (streq (topologyresolver_to_string (resolver), "NA"));
+    res = topologyresolver_to_string (resolver);
+    assert (streq (res, "NA"));
+    zstr_free (&res);
 
     fty_proto_t *msg5 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg5, "newparent");
@@ -442,7 +450,9 @@ topologyresolver_test (bool verbose)
     fty_proto_set_aux (msg5, &aux);
 
     topologyresolver_asset (resolver, msg5);
-    assert (streq ("my nice grandparent->this is new father", topologyresolver_to_string (resolver, "->")));
+    res = topologyresolver_to_string (resolver, "->");
+    assert (streq ("my nice grandparent->this is new father", res));
+    zstr_free (&res);
 
     fty_proto_destroy(&msg5);
     fty_proto_destroy(&msg4);
