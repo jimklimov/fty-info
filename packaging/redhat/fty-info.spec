@@ -54,7 +54,6 @@ BuildRequires:  zeromq-devel
 BuildRequires:  czmq-devel
 BuildRequires:  malamute-devel
 BuildRequires:  cxxtools-devel
-BuildRequires:  tntdb-devel
 BuildRequires:  fty-proto-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
@@ -83,7 +82,6 @@ Requires:       zeromq-devel
 Requires:       czmq-devel
 Requires:       malamute-devel
 Requires:       cxxtools-devel
-Requires:       tntdb-devel
 Requires:       fty-proto-devel
 
 %description devel
