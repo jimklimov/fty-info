@@ -4,8 +4,8 @@
 
 [Unit]
 Description=fty-info service
-After=malamute.service network.target bios-db-init.service
-Requires=malamute.service network.target bios-db-init.service
+After=malamute.service network.target 
+Requires=malamute.service network.target 
 PartOf=bios.target
 
 [Service]
@@ -21,7 +21,6 @@ EnvironmentFile=-@sysconfdir@/default/bios__%n.conf
 EnvironmentFile=-@sysconfdir@/default/fty
 EnvironmentFile=-@sysconfdir@/default/fty__%n.conf
 Environment="prefix=@prefix@"
-EnvironmentFile=-@sysconfdir@/default/bios-db-ro
 ExecStart=@prefix@/bin/fty-info @sysconfdir@/@PACKAGE@/fty-info.cfg
 
 [Install]
