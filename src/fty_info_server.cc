@@ -139,6 +139,7 @@ s_publish_announce(fty_info_server_t  * self)
 
     //prepare  msg content
     zmsg_t *msg=zmsg_new();
+    zmsg_addstr (msg, FTY_INFO_CMD);
     char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
     zmsg_addstr (msg, srv_name);
     zmsg_addstr (msg, SRV_TYPE);
