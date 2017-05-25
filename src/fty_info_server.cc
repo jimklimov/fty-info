@@ -771,6 +771,8 @@ fty_info_server_test (bool verbose)
         assert(recv);
         const char *command = mlm_client_command (client);
         assert(streq (command, "STREAM DELIVER"));
+        char* cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name = zmsg_popstr (recv);
         assert (srv_name && streq (srv_name,"IPC (ce7c523e)"));
         zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
@@ -826,6 +828,7 @@ fty_info_server_test (bool verbose)
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
         zstr_free (&srv_port);
+        zstr_free (&cmd);
 
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
