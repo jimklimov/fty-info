@@ -104,11 +104,9 @@ char *s_get_name(const char *name, const char *uuid)
     return buffer;
 }
 
-//  --------------------------------------------------------------------------
-//  publish announcement on STREAM ANNOUNCE/ANNOUNCE-TEST
-//  subject : CREATE/UPDATE
+// create INFO reply/publish message
 //  body :
-//    - name    IPC (XXXXXXXX)
+//    - name    IPC (12378)
 //    - type    _https._tcp.
 //    - subtype _powerservice._sub._https._tcp.
 //    - port    443
@@ -124,6 +122,29 @@ char *s_get_name(const char *name, const char *uuid)
 //          protocol format
 //          type
 //          version
+static zmsg_t*
+s_create_info (ftyinfo_t *info)
+{
+    zmsg_t *msg=zmsg_new();
+    zmsg_addstr (msg, FTY_INFO_CMD);
+    char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
+    zmsg_addstr (msg, srv_name);
+    zmsg_addstr (msg, SRV_TYPE);
+    zmsg_addstr (msg, SRV_STYPE);
+    zmsg_addstr (msg, SRV_PORT);
+
+    zhash_t *map = ftyinfo_infohash (info);
+    zframe_t * frame_infos = zhash_pack(map);
+    zmsg_append (msg, &frame_infos);
+
+    zstr_free(&srv_name);
+    zframe_destroy(&frame_infos);
+    return msg;
+}
+
+//  --------------------------------------------------------------------------
+//  publish INFO announcement on STREAM ANNOUNCE/ANNOUNCE-TEST
+//  subject : CREATE/UPDATE
 static void
 s_publish_announce(fty_info_server_t  * self)
 {
@@ -137,18 +158,8 @@ s_publish_announce(fty_info_server_t  * self)
     else
         info = ftyinfo_test_new ();
 
-    //prepare  msg content
-    zmsg_t *msg=zmsg_new();
-    zmsg_addstr (msg, FTY_INFO_CMD);
-    char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
-    zmsg_addstr (msg, srv_name);
-    zmsg_addstr (msg, SRV_TYPE);
-    zmsg_addstr (msg, SRV_STYPE);
-    zmsg_addstr (msg, SRV_PORT);
+    zmsg_t *msg = s_create_info (info);
 
-    zhash_t *map = ftyinfo_infohash (info);
-    zframe_t * frame_infos = zhash_pack(map);
-    zmsg_append (msg, &frame_infos);
     if (self->first_announce) {
         if (mlm_client_send (self->announce_client, "CREATE", &msg) != -1) {
             zsys_info("publish CREATE msg on ANNOUNCE STREAM");
@@ -162,8 +173,6 @@ s_publish_announce(fty_info_server_t  * self)
         else
             zsys_error("cant publish UPDATE msg on ANNOUNCE STREAM");
     }
-    zstr_free(&srv_name);
-    zframe_destroy(&frame_infos);
     ftyinfo_destroy (&info);
 }
 //  --------------------------------------------------------------------------
@@ -282,23 +291,6 @@ s_handle_stream (fty_info_server_t* self, zmsg_t *message)
 
 //  --------------------------------------------------------------------------
 //  process message from MAILBOX DELIVER INFO INFO/INFO-TEST
-//  body :
-//    - name    IPC (12378)
-//    - type    _https._tcp.
-//    - subtype _powerservice._sub._https._tcp.
-//    - port    443
-//    - hashtable : TXT name, TXT value
-//          uuid
-//          name
-//          vendor
-//          serial
-//          model
-//          location
-//          version
-//          path
-//          protocol format
-//          type
-//          version
 void static
 s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
 {
@@ -321,7 +313,6 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     else {
         zsys_debug ("fty-info:do '%s'", command);
-        zmsg_t *reply = zmsg_new ();
         char *zuuid = zmsg_popstr (message);
         ftyinfo_t *info;
         if (streq(command, "INFO")) {
@@ -330,20 +321,11 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         if (streq(command, "INFO-TEST")) {
             info = ftyinfo_test_new ();
         }
-        //prepare replied msg content
-        zmsg_addstrf (reply, "%s", zuuid);
-        char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid (info));
-        zmsg_addstr (reply, srv_name);
-        zmsg_addstr (reply, SRV_TYPE);
-        zmsg_addstr (reply, SRV_STYPE);
-        zmsg_addstr (reply, SRV_PORT);
 
-        zframe_t * frame_infos = zhash_pack(ftyinfo_infohash (info));
-        zmsg_append (reply, &frame_infos);
+        zmsg_t *reply = s_create_info (info);
+        zmsg_pushstrf (reply, "%s", zuuid);
         mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
-        zframe_destroy(&frame_infos);
         zstr_free (&zuuid);
-        zstr_free(&srv_name);
         ftyinfo_destroy (&info);
     }
     zstr_free (&command);
@@ -444,11 +426,13 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
 
-        assert (zmsg_size (recv) == 6);
+        assert (zmsg_size (recv) == 7);
         zsys_debug ("fty-info-test: zmsg_size = %d",zmsg_size (recv));
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
 
+        char *cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name = zmsg_popstr (recv);
         assert (srv_name && streq (srv_name,"IPC (ce7c523e)"));
         zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
@@ -499,6 +483,7 @@ fty_info_server_test (bool verbose)
         assert(rest_root && streq (rest_root, TXT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
         zstr_free (&zuuid_reply);
+        zstr_free (&cmd);
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
@@ -520,9 +505,12 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
 
-        assert (zmsg_size (recv) == 6);
+        assert (zmsg_size (recv) == 7);
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+
+        char *cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
 
         char *srv_name  = zmsg_popstr (recv);
         char *srv_type  = zmsg_popstr (recv);
@@ -539,6 +527,7 @@ fty_info_server_test (bool verbose)
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
+        zstr_free (&cmd);
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
@@ -588,9 +577,11 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
 
-        assert (zmsg_size (recv) == 6);
+        assert (zmsg_size (recv) == 7);
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+        char *cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name  = zmsg_popstr (recv);
         char *srv_type  = zmsg_popstr (recv);
         char *srv_stype = zmsg_popstr (recv);
@@ -612,6 +603,7 @@ fty_info_server_test (bool verbose)
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
+        zstr_free (&cmd);
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
@@ -658,9 +650,11 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
 
-        assert (zmsg_size (recv) == 6);
+        assert (zmsg_size (recv) == 7);
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+        char *cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name  = zmsg_popstr (recv);
         char *srv_type  = zmsg_popstr (recv);
         char *srv_stype = zmsg_popstr (recv);
@@ -681,6 +675,7 @@ fty_info_server_test (bool verbose)
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
+        zstr_free (&cmd);
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
@@ -727,9 +722,11 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
 
-        assert (zmsg_size (recv) == 6);
+        assert (zmsg_size (recv) == 7);
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
+        char *cmd = zmsg_popstr (recv);
+        assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name  = zmsg_popstr (recv);
         char *srv_type  = zmsg_popstr (recv);
         char *srv_stype = zmsg_popstr (recv);
@@ -751,6 +748,7 @@ fty_info_server_test (bool verbose)
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
+        zstr_free (&cmd);
         zstr_free (&srv_name);
         zstr_free (&srv_type);
         zstr_free (&srv_stype);
