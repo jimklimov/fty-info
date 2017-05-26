@@ -126,7 +126,7 @@ ftyinfo_new (topologyresolver_t *resolver)
 
     //set parent_uri
     self->parent_uri = topologyresolver_to_parent_uri (resolver);
-    zsys_info ("fty-info:location_uri  = '%s'", self->parent_uri);
+    zsys_info ("fty-info:parent_uri  = '%s'", self->parent_uri);
 
     //set uuid, vendor, model from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
