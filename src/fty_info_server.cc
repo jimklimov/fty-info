@@ -112,16 +112,20 @@ char *s_get_name(const char *name, const char *uuid)
 //    - port    443
 //    - hashtable : TXT name, TXT value
 //          uuid
-//          name
+//          name (meaning user-friendly name)
+//          name_uri
 //          vendor
 //          serial
 //          model
 //          location
+//          parent_uri
 //          version
 //          path
 //          protocol format
-//          type
+//          type (meaning device type)
 //          version
+//          hostname
+//          txtvers
 static zmsg_t*
 s_create_info (ftyinfo_t *info)
 {
@@ -473,9 +477,9 @@ fty_info_server_test (bool verbose)
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
-        char * location_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
-        assert(location_uri && streq (location_uri, TST_PARENT_URI));
-        zsys_debug ("fty-info-test: location_uri = '%s'", location_uri);
+        char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
+        assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
+        zsys_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
@@ -811,9 +815,9 @@ fty_info_server_test (bool verbose)
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
-        char * location_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
-        assert(location_uri && streq (location_uri, TST_PARENT_URI));
-        zsys_debug ("fty-info-test: location_uri = '%s'", location_uri);
+        char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
+        assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
+        zsys_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
