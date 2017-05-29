@@ -121,7 +121,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
 
     //set location
-    self->location = topologyresolver_to_string (resolver, ">");
+    self->location = strdup (topologyresolver_to_string (resolver, ">"));
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set parent_uri
