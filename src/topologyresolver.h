@@ -52,7 +52,7 @@ FTY_INFO_PRIVATE char *
     topologyresolver_to_rc_name (topologyresolver_t *self);
 
 //  Return topology as string of friedly names (or NULL if incomplete)
-FTY_INFO_PRIVATE char *
+FTY_INFO_PRIVATE const char *
     topologyresolver_to_string (topologyresolver_t *self, const char *separator = "/");
 
 //  Return zlist of inames starting with asset up to DC
