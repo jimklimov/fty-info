@@ -106,6 +106,7 @@ char *s_get_name(const char *name, const char *uuid)
 
 // create INFO reply/publish message
 //  body :
+//    - INFO (command))
 //    - name    IPC (12378)
 //    - type    _https._tcp.
 //    - subtype _powerservice._sub._https._tcp.
