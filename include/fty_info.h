@@ -36,6 +36,7 @@
 #define INFO_VENDOR    "manufacturer"
 #define INFO_SERIAL    "serialNumber"
 #define INFO_MODEL     "model"
+#define INFO_PART_NUMBER    "partNumber"
 #define INFO_LOCATION  "location"
 #define INFO_PARENT_URI  "parent-uri"
 #define INFO_VERSION   "version"
