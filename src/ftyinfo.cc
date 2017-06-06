@@ -46,6 +46,7 @@ struct _ftyinfo_t {
     char *model;
     char *vendor;
     char *serial;
+    char *part_number;
     char *location;
     char *parent_uri;
     char *version;
@@ -140,11 +141,11 @@ ftyinfo_new (topologyresolver_t *resolver)
     self->vendor = s_get_release_details (si, "hardware-vendor", "NA");
     self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
     self->model  = s_get_release_details (si, "hardware-catalog-number", "NA");
+    self->part_number  = s_get_release_details (si, "hardware-part-number", "NA");
     zsys_info ("fty-info:uuid      = '%s'", self->uuid);
     zsys_info ("fty-info:vendor    = '%s'", self->vendor);
     zsys_info ("fty-info:serial    = '%s'", self->serial);
     zsys_info ("fty-info:model     = '%s'", self->model);
-
 
     // TODO: set version
     self->version   = strdup ("NotImplemented");
@@ -182,6 +183,7 @@ ftyinfo_test_new (void)
     self->model     = strdup (TST_MODEL);
     self->vendor    = strdup (TST_VENDOR);
     self->serial    = strdup (TST_SERIAL);
+    self->part_number    = strdup (TST_PART_NUMBER);
     self->location  = strdup (TST_LOCATION);
     self->parent_uri  = strdup (TST_PARENT_URI);
     self->version   = strdup (TST_VERSION);
@@ -213,6 +215,7 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         zstr_free (&self->model);
         zstr_free (&self->vendor);
         zstr_free (&self->serial);
+        zstr_free (&self->part_number);
         zstr_free (&self->location);
         zstr_free (&self->parent_uri);
         zstr_free (&self->version);
@@ -248,6 +251,7 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_insert(self->infos, INFO_VENDOR, self->vendor);
     zhash_insert(self->infos, INFO_MODEL, self->model);
     zhash_insert(self->infos, INFO_SERIAL, self->serial);
+    zhash_insert(self->infos, INFO_PART_NUMBER, self->part_number);
     zhash_insert(self->infos, INFO_LOCATION, self->location);
     zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
     zhash_insert(self->infos, INFO_VERSION, self->version);

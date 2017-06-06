@@ -47,6 +47,7 @@ extern "C" {
 #define TST_MODEL       "IPC3000"
 #define TST_VENDOR      "Eaton"
 #define TST_SERIAL      "LA71026006"
+#define TST_PART_NUMBER      "123456"
 #define TST_LOCATION         "Rack1"
 #define TST_PARENT_INAME   "rack-001"
 #define TST_PARENT_URI     "/asset/rack-001"
