@@ -38,6 +38,7 @@ extern "C" {
 #define TXT_VER  "1"
 
 //test value for INFO-TEST command reply
+#define TST_ID          "rackcontroller-2"
 #define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME    "localhost"
 #define TST_NAME        "MyIPC"
@@ -46,6 +47,7 @@ extern "C" {
 #define TST_MODEL       "IPC3000"
 #define TST_VENDOR      "Eaton"
 #define TST_SERIAL      "LA71026006"
+#define TST_PART_NUMBER      "123456"
 #define TST_LOCATION         "Rack1"
 #define TST_PARENT_INAME   "rack-001"
 #define TST_PARENT_URI     "/asset/rack-001"

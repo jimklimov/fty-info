@@ -208,12 +208,24 @@ topologyresolver_destroy (topologyresolver_t **self_p)
 }
 
 //  --------------------------------------------------------------------------
+//  get RC internal name
+
+const char *
+topologyresolver_id (topologyresolver_t *self)
+{
+    if (! self || ! self->iname) return "NA";
+    return  self->iname;
+}
+
+//  --------------------------------------------------------------------------
 //  Give topology resolver one asset information
 void
 topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 {
     if (! self || ! message) return;
     if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
+    const char *operation = fty_proto_operation (message);
+    if (operation && streq (operation, "inventory")) return;
 
     if (!self->iname && s_is_this_me (message)) {
         self->iname = strdup (fty_proto_name (message));
