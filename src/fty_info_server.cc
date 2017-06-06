@@ -112,6 +112,7 @@ char *s_get_name(const char *name, const char *uuid)
 //    - subtype _powerservice._sub._https._tcp.
 //    - port    443
 //    - hashtable : TXT name, TXT value
+//          id (internal id "rackcontroller-33")
 //          uuid
 //          name (meaning user-friendly name)
 //          name_uri

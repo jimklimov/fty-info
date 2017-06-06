@@ -35,6 +35,10 @@ FTY_INFO_PRIVATE topologyresolver_t *
 FTY_INFO_PRIVATE void
     topologyresolver_destroy (topologyresolver_t **self_p);
 
+//  get RC internal name
+FTY_INFO_PRIVATE const char *
+    topologyresolver_id (topologyresolver_t *self);
+
 // Return URI of asset for this topologyresolver
 FTY_INFO_PRIVATE char *
     topologyresolver_to_rc_name_uri (topologyresolver_t *self);
