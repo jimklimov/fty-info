@@ -38,6 +38,7 @@ extern "C" {
 #define TXT_VER  "1"
 
 //test value for INFO-TEST command reply
+#define TST_ID          "rackcontroller-2"
 #define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME    "localhost"
 #define TST_NAME        "MyIPC"

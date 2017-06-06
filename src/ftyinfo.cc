@@ -38,6 +38,7 @@
 
 struct _ftyinfo_t {
     zhash_t *infos;
+    char *id;
     char *uuid;
     char *hostname;
     char *name;
@@ -112,13 +113,17 @@ ftyinfo_new (topologyresolver_t *resolver)
     zstr_free (&hostname);
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
 
+    //set id
+    self->id = strdup (topologyresolver_id (resolver));
+    zsys_info ("fty-info:id        = '%s'", self->id);
+
     //set name
     self->name = topologyresolver_to_rc_name (resolver);
     zsys_info ("fty-info:name      = '%s'", self-> name);
 
     //set name_uri
     self->name_uri = topologyresolver_to_rc_name_uri (resolver);
-    zsys_info ("fty-info:name_uri      = '%s'", self-> name_uri);
+    zsys_info ("fty-info:name_uri  = '%s'", self-> name_uri);
 
     //set location
     self->location = strdup (topologyresolver_to_string (resolver, ">"));
@@ -126,7 +131,7 @@ ftyinfo_new (topologyresolver_t *resolver)
 
     //set parent_uri
     self->parent_uri = topologyresolver_to_parent_uri (resolver);
-    zsys_info ("fty-info:parent_uri  = '%s'", self->parent_uri);
+    zsys_info ("fty-info:parent_uri= '%s'", self->parent_uri);
 
     //set uuid, vendor, model from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
@@ -169,6 +174,7 @@ ftyinfo_test_new (void)
     ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
     // TXT attributes
     self->infos     = zhash_new();
+    self->id        = strdup (TST_ID);
     self->uuid      = strdup (TST_UUID);
     self->hostname  = strdup (TST_HOSTNAME);
     self->name      = strdup (TST_NAME);
@@ -199,6 +205,7 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         ftyinfo_t *self = *self_ptr;
         // Free class properties here
         zhash_destroy(&self->infos);
+        zstr_free (&self->id);
         zstr_free (&self->uuid);
         zstr_free (&self->hostname);
         zstr_free (&self->name);
