@@ -134,7 +134,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     self->parent_uri = topologyresolver_to_parent_uri (resolver);
     zsys_info ("fty-info:parent_uri= '%s'", self->parent_uri);
 
-    //set uuid, vendor, model from /etc/release-details.json
+    //set uuid, vendor, model, part_number, verson from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
     si = s_load_release_details();
     self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
@@ -142,19 +142,19 @@ ftyinfo_new (topologyresolver_t *resolver)
     self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
     self->model  = s_get_release_details (si, "hardware-catalog-number", "NA");
     self->part_number  = s_get_release_details (si, "hardware-part-number", "NA");
+    self->version   = s_get_release_details (si, "osimage-name", "NA");
     zsys_info ("fty-info:uuid      = '%s'", self->uuid);
     zsys_info ("fty-info:vendor    = '%s'", self->vendor);
     zsys_info ("fty-info:serial    = '%s'", self->serial);
     zsys_info ("fty-info:model     = '%s'", self->model);
+    zsys_info ("fty-info:part_number     = '%s'", self->part_number);
+    zsys_info ("fty-info:version     = '%s'", self->version);
 
-    // TODO: set version
-    self->version   = strdup ("NotImplemented");
     // use default
     self->path = strdup (TXT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);
-    zsys_info ("fty-info:version = '%s'", self->version);
     zsys_info ("fty-info:path = '%s'", self->path);
     zsys_info ("fty-info:protocol_format = '%s'", self->protocol_format);
     zsys_info ("fty-info:type = '%s'", self->type);
