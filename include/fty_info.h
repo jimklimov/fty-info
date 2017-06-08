@@ -29,6 +29,7 @@
 #define FTY_INFO_AGENT "fty-info"
 #define FTY_INFO_CMD "INFO"
 
+#define INFO_ID        "id"
 #define INFO_UUID      "uuid"
 #define INFO_HOSTNAME  "hostname"
 #define INFO_NAME      "name"

@@ -244,6 +244,7 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_destroy (&self->infos);
     self->infos = zhash_new ();
 
+    zhash_insert (self->infos, INFO_ID, self->id);
     zhash_insert(self->infos, INFO_UUID, self->uuid);
     zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
     zhash_insert(self->infos, INFO_NAME, self->name);
