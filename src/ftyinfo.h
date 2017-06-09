@@ -55,6 +55,9 @@ extern "C" {
 #define TST_PARENT2_INAME  "rack-002"
 #define TST_PARENT2_URI    "/asset/rack-002"
 #define TST_VERSION     "1.0.0"
+#define TST_DESCRIPTION     "Test IPC"
+#define TST_CONTACT     "N.N."
+#define TST_INSTALL_DATE     "2017-02-30T00:00:00Z"
 #define TST_PATH        "/api/v1"
 #define TST_PORT        "80"
 

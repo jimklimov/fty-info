@@ -55,6 +55,14 @@ FTY_INFO_PRIVATE char *
 FTY_INFO_PRIVATE char *
     topologyresolver_to_rc_name (topologyresolver_t *self);
 
+//  Return description of the asset
+FTY_INFO_PRIVATE char *
+    topologyresolver_to_description (topologyresolver_t *self);
+
+//  Return contact of the asset
+FTY_INFO_PRIVATE char *
+    topologyresolver_to_contact (topologyresolver_t *self);
+
 //  Return topology as string of friedly names (or NULL if incomplete)
 FTY_INFO_PRIVATE const char *
     topologyresolver_to_string (topologyresolver_t *self, const char *separator = "/");
