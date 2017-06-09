@@ -308,6 +308,53 @@ topologyresolver_to_rc_name (topologyresolver_t *self)
 }
 
 //  --------------------------------------------------------------------------
+//  Return description of the asset
+char *
+topologyresolver_to_description (topologyresolver_t *self)
+{
+    if (self && self->iname) {
+        fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+        if (rc_message)
+            return strdup (fty_proto_ext_string (rc_message, "description", "NA"));
+        else
+            return strdup ("NA");
+    }
+    else
+        return strdup ("NA");
+}
+
+//  --------------------------------------------------------------------------
+//  Return contact of the asset
+char *
+topologyresolver_to_contact (topologyresolver_t *self)
+{
+    if (self && self->iname) {
+        fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+        if (rc_message)
+            return strdup (fty_proto_ext_string (rc_message, "contact", "NA"));
+        else
+            return strdup ("NA");
+    }
+    else
+        return strdup ("NA");
+}
+
+//  --------------------------------------------------------------------------
+//  Return install date of the asset
+char *
+topologyresolver_to_install_date (topologyresolver_t *self)
+{
+    if (self && self->iname) {
+        fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
+        if (rc_message)
+            return strdup (fty_proto_ext_string (rc_message, "installDate", "NA"));
+        else
+            return strdup ("NA");
+    }
+    else
+        return strdup ("NA");
+}
+//  --------------------------------------------------------------------------
 //  Return topology as string of friendly names (or NULL if incomplete)
 const char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)

@@ -50,6 +50,9 @@ struct _ftyinfo_t {
     char *location;
     char *parent_uri;
     char *version;
+    char *description;
+    char *contact;
+    char *installDate;
     char *path;
     char *protocol_format;
     char *type;
@@ -150,6 +153,11 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:part_number     = '%s'", self->part_number);
     zsys_info ("fty-info:version     = '%s'", self->version);
 
+    // set description, contact, installDate
+    self->description = topologyresolver_to_description (resolver);
+    self->contact = topologyresolver_to_contact (resolver);
+    self->installDate = topologyresolver_to_install_date (resolver);
+
     // use default
     self->path = strdup (TXT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
@@ -187,6 +195,9 @@ ftyinfo_test_new (void)
     self->location  = strdup (TST_LOCATION);
     self->parent_uri  = strdup (TST_PARENT_URI);
     self->version   = strdup (TST_VERSION);
+    self->description = strdup (TST_DESCRIPTION);
+    self->contact = strdup (TST_CONTACT);
+    self->installDate = strdup (TST_INSTALL_DATE);
     self->path      = strdup (TXT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type      = strdup (TXT_TYPE);
@@ -219,6 +230,9 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         zstr_free (&self->location);
         zstr_free (&self->parent_uri);
         zstr_free (&self->version);
+        zstr_free (&self->description);
+        zstr_free (&self->contact);
+        zstr_free (&self->installDate);
         zstr_free (&self->path);
         zstr_free (&self->protocol_format);
         zstr_free (&self->type);
@@ -256,6 +270,9 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_insert(self->infos, INFO_LOCATION, self->location);
     zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
     zhash_insert(self->infos, INFO_VERSION, self->version);
+    zhash_insert(self->infos, INFO_DESCRIPTION, self->description);
+    zhash_insert(self->infos, INFO_CONTACT, self->contact);
+    zhash_insert(self->infos, INFO_INSTALL_DATE, self->installDate);
     zhash_insert(self->infos, INFO_REST_PATH, self->path);
     zhash_insert(self->infos, INFO_PROTOCOL_FORMAT, self->protocol_format);
     zhash_insert(self->infos, INFO_TYPE, self->type);
