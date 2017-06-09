@@ -59,6 +59,55 @@ struct _ftyinfo_t {
     char *txtvers;
 };
 
+static const char* EV_DATA_DIR = "DATADIR";
+
+static int
+s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n) {
+    struct tm* tmp = gmtime (&timestamp);
+    if (!tmp || strftime (buffer, n, "%FT%TZ", tmp) == 0) { // it's safe to check for 0, since we expect non-zero string
+        return -1;
+    }
+    return 0;
+}
+
+static char*
+s_get_accepted_license_file (void)
+{
+    char *accepted_license = NULL;
+    char *env = getenv (EV_DATA_DIR);
+
+    if (asprintf (&accepted_license, "%s/license", env ? env : "/var/lib/fty" ) == -1) {
+        return NULL;
+    }
+    return accepted_license;
+}
+
+static void
+s_get_installation_date (
+        const std::string& file,
+        std::string& installation_date)
+{
+    try {
+        std::ifstream finput (file);
+        if (finput.is_open () && finput.good ()) {
+            // We assume the second line is license acceptance unix time
+            std::getline (finput, installation_date);
+            std::getline (finput, installation_date);
+            int64_t i64 = std::stoll (installation_date);
+            // TODO: we should probably check for time_t max/min, but hey!... ;)
+            char chtmp[64];
+            if (s_calendar_to_datetime ((time_t) i64, chtmp, 64) == -1) {
+                installation_date = "N/A - Error retrieveing installation date";
+                throw std::runtime_error ("calendar_to_datetime () failed.");
+            }
+            installation_date.assign (chtmp);
+        }
+    }
+    catch (const std::exception& e) {
+        zsys_error ("Exception caught: %s", e.what ());
+    }
+}
+
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
 static cxxtools::SerializationInfo*
@@ -153,10 +202,19 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:part_number     = '%s'", self->part_number);
     zsys_info ("fty-info:version     = '%s'", self->version);
 
-    // set description, contact, installDate
+    // set description, contact
     self->description = topologyresolver_to_description (resolver);
     self->contact = topologyresolver_to_contact (resolver);
-    self->installDate = topologyresolver_to_install_date (resolver);
+    zsys_info ("fty-info:description     = '%s'", self->description);
+    zsys_info ("fty-info:contact     = '%s'", self->contact);
+
+    //set installDate
+    char *license = s_get_accepted_license_file ();
+    std::string datetime;
+    s_get_installation_date (license, datetime);
+    self->installDate = strdup (datetime.c_str ());
+    zsys_info ("fty-info:installDate     = '%s'", self->installDate);
+    zstr_free (&license);
 
     // use default
     self->path = strdup (TXT_PATH);
