@@ -50,11 +50,63 @@ struct _ftyinfo_t {
     char *location;
     char *parent_uri;
     char *version;
+    char *description;
+    char *contact;
+    char *installDate;
     char *path;
     char *protocol_format;
     char *type;
     char *txtvers;
 };
+
+static const char* EV_DATA_DIR = "DATADIR";
+
+static int
+s_calendar_to_datetime(time_t timestamp, char* buffer, size_t n) {
+    struct tm* tmp = gmtime (&timestamp);
+    if (!tmp || strftime (buffer, n, "%FT%TZ", tmp) == 0) { // it's safe to check for 0, since we expect non-zero string
+        return -1;
+    }
+    return 0;
+}
+
+static char*
+s_get_accepted_license_file (void)
+{
+    char *accepted_license = NULL;
+    char *env = getenv (EV_DATA_DIR);
+
+    if (asprintf (&accepted_license, "%s/license", env ? env : "/var/lib/fty" ) == -1) {
+        return NULL;
+    }
+    return accepted_license;
+}
+
+static void
+s_get_installation_date (
+        const std::string& file,
+        std::string& installation_date)
+{
+    try {
+        std::ifstream finput (file);
+        if (finput.is_open () && finput.good ()) {
+            // We assume the second line is license acceptance unix time
+            std::getline (finput, installation_date);
+            std::getline (finput, installation_date);
+            int64_t i64 = std::stoll (installation_date);
+            // TODO: we should probably check for time_t max/min, but hey!... ;)
+            char chtmp[64];
+            if (s_calendar_to_datetime ((time_t) i64, chtmp, 64) == -1) {
+                installation_date = "N/A - Error retrieveing installation date";
+                throw std::runtime_error ("calendar_to_datetime () failed.");
+            }
+            installation_date.assign (chtmp);
+        }
+    }
+    catch (const std::exception& e) {
+        zsys_error ("Exception caught: %s", e.what ());
+    }
+}
 
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
 
@@ -150,6 +202,20 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:part_number     = '%s'", self->part_number);
     zsys_info ("fty-info:version     = '%s'", self->version);
 
+    // set description, contact
+    self->description = topologyresolver_to_description (resolver);
+    self->contact = topologyresolver_to_contact (resolver);
+    zsys_info ("fty-info:description     = '%s'", self->description);
+    zsys_info ("fty-info:contact     = '%s'", self->contact);
+
+    //set installDate
+    char *license = s_get_accepted_license_file ();
+    std::string datetime;
+    s_get_installation_date (license, datetime);
+    self->installDate = strdup (datetime.c_str ());
+    zsys_info ("fty-info:installDate     = '%s'", self->installDate);
+    zstr_free (&license);
+
     // use default
     self->path = strdup (TXT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
@@ -187,6 +253,9 @@ ftyinfo_test_new (void)
     self->location  = strdup (TST_LOCATION);
     self->parent_uri  = strdup (TST_PARENT_URI);
     self->version   = strdup (TST_VERSION);
+    self->description = strdup (TST_DESCRIPTION);
+    self->contact = strdup (TST_CONTACT);
+    self->installDate = strdup (TST_INSTALL_DATE);
     self->path      = strdup (TXT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type      = strdup (TXT_TYPE);
@@ -219,6 +288,9 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         zstr_free (&self->location);
         zstr_free (&self->parent_uri);
         zstr_free (&self->version);
+        zstr_free (&self->description);
+        zstr_free (&self->contact);
+        zstr_free (&self->installDate);
         zstr_free (&self->path);
         zstr_free (&self->protocol_format);
         zstr_free (&self->type);
@@ -244,6 +316,7 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_destroy (&self->infos);
     self->infos = zhash_new ();
 
+    zhash_insert (self->infos, INFO_ID, self->id);
     zhash_insert(self->infos, INFO_UUID, self->uuid);
     zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
     zhash_insert(self->infos, INFO_NAME, self->name);
@@ -255,6 +328,9 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_insert(self->infos, INFO_LOCATION, self->location);
     zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
     zhash_insert(self->infos, INFO_VERSION, self->version);
+    zhash_insert(self->infos, INFO_DESCRIPTION, self->description);
+    zhash_insert(self->infos, INFO_CONTACT, self->contact);
+    zhash_insert(self->infos, INFO_INSTALL_DATE, self->installDate);
     zhash_insert(self->infos, INFO_REST_PATH, self->path);
     zhash_insert(self->infos, INFO_PROTOCOL_FORMAT, self->protocol_format);
     zhash_insert(self->infos, INFO_TYPE, self->type);

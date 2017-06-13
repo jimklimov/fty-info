@@ -29,6 +29,7 @@
 #define FTY_INFO_AGENT "fty-info"
 #define FTY_INFO_CMD "INFO"
 
+#define INFO_ID        "id"
 #define INFO_UUID      "uuid"
 #define INFO_HOSTNAME  "hostname"
 #define INFO_NAME      "name"
@@ -40,6 +41,9 @@
 #define INFO_LOCATION  "location"
 #define INFO_PARENT_URI  "parent-uri"
 #define INFO_VERSION   "version"
+#define INFO_DESCRIPTION   "description"
+#define INFO_CONTACT   "contact"
+#define INFO_INSTALL_DATE   "installDate"
 #define INFO_REST_PATH "path"
 #define INFO_REST_PORT "port"
 #define INFO_PROTOCOL_FORMAT "protocol-format"
