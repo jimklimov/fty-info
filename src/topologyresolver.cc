@@ -331,7 +331,7 @@ topologyresolver_to_contact (topologyresolver_t *self)
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "contact", "NA"));
+            return strdup (fty_proto_ext_string (rc_message, "contact_email", "NA"));
         else
             return strdup ("NA");
     }
