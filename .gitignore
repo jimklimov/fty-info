@@ -53,6 +53,7 @@ config.log
 config.status
 config/
 configure
+configure.lineno
 libtool
 src/platform.h
 src/platform.h.in
@@ -75,6 +76,7 @@ Testing/
 libzmq/
 czmq/
 malamute/
+cxxtools/
 fty-proto/
 
 # Travis build area
