@@ -4,8 +4,9 @@
 
 [Unit]
 Description=fty-info service
-After=malamute.service network.target 
-Requires=malamute.service network.target 
+After=malamute.service network.target
+Before=fty-asset.service
+Requires=malamute.service network.target
 PartOf=bios.target
 
 [Service]
