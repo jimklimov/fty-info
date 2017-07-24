@@ -35,18 +35,35 @@ s_announce_event (zloop_t *loop, int timer_id, void *output)
     return 0;
 }
 
+void
+usage(){
+    puts   ("fty-info [options] ...");
+    puts   ("  -v|--verbose        verbose test output");
+    puts   ("  -h|--help           this information");
+    puts   ("  -c|--config         path to config file\n");
+    puts   ("  -e|--endpoint       malamute endpoint [ipc://@/malamute]");
+    printf ("  -a|--announce       how often (in seconds) publish information on stream [%d]\n", DEFAULT_ANNOUNCE_INTERVAL_SEC);
+
+}
+
 int main (int argc, char *argv [])
 {
+    int announcing = DEFAULT_ANNOUNCE_INTERVAL_SEC;
+    char *config_file = NULL;
+    zconfig_t *config = NULL;
+    char* actor_name = NULL;
+    char* endpoint = NULL;
     bool verbose = false;
-    int announcing = 60;
     int argn;
+
+    // Parse command line
     for (argn = 1; argn < argc; argn++) {
+        char *param = NULL;
+        if (argn < argc - 1) param = argv [argn+1];
+
         if (streq (argv [argn], "--help")
         ||  streq (argv [argn], "-h")) {
-            puts ("fty-info [options] ...");
-            puts ("  --verbose / -v   verbose test output");
-            puts ("  --announce / -a  how often (in seconds) publish information on stream [60]");
-            puts ("  --help / -h      this information");
+            usage();
             return 0;
         }
         else if (streq (argv [argn], "--verbose") ||  streq (argv [argn], "-v")) {
@@ -58,11 +75,56 @@ int main (int argc, char *argv [])
                 announcing = atoi (argv [argn]);
             }
         }
+        else if (streq (argv [argn], "--config") || streq (argv [argn], "-c")) {
+            if (param) config_file = param;
+            ++argn;
+        }
+        else if (streq (argv [argn], "--endpoint") || streq (argv [argn], "-e")) {
+            if (param) endpoint = strdup(param);
+            ++argn;
+        }
+        else {
+            // FIXME: as per the systemd service file, the config file
+            // is provided as the default arg without '-c'!
+            // So, should we consider this?
+            printf ("Unknown option: %s\n", argv [argn]);
+            return 1;
+        }
     }
-    if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
-                verbose = true;
 
-    zactor_t *server = zactor_new (fty_info_server, (void*) FTY_INFO_AGENT);
+    // Parse config file
+    if(config_file) {
+        my_zsys_debug (verbose, "fty_info: loading configuration file '%s'", config_file);
+        config = zconfig_load (config_file);
+        if (!config) {
+            zsys_error ("Failed to load config file %s: %m", config_file);
+            exit (EXIT_FAILURE);
+        }
+        // VERBOSE
+        if (streq (zconfig_get (config, "server/verbose", "false"), "true")) {
+            verbose = true;
+        }
+
+        // Announcement interval (in seconds)
+        const char *str_announcing = s_get (config, "server/announce", "60");
+        if (str_announcing) {
+            announcing = atoi(str_announcing);
+        }
+
+        if (endpoint) zstr_free(&endpoint);
+        endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
+        actor_name = strdup(s_get (config, "malamute/address", NULL));
+    }
+    if (actor_name == NULL)
+        actor_name = strdup(FTY_INFO_AGENT);
+    if (endpoint == NULL)
+        endpoint = strdup("ipc://@/malamute");
+
+    // Check env. variables
+    if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
+        verbose = true;
+
+    zactor_t *server = zactor_new (fty_info_server, (void*) actor_name);
 
     //  Insert main code here
     if (verbose) {
@@ -70,7 +132,7 @@ int main (int argc, char *argv [])
         zsys_info ("fty_info - Agent which returns rack controller information");
     }
 
-    zstr_sendx (server, "CONNECT", "ipc://@/malamute", FTY_INFO_AGENT, NULL);
+    zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
 
@@ -78,7 +140,12 @@ int main (int argc, char *argv [])
     zloop_timer (announce, announcing * 1000, 0, s_announce_event, server);
     zloop_start (announce);
 
+    // Cleanup
     zloop_destroy (&announce);
     zactor_destroy (&server);
+    zstr_free(&actor_name);
+    zstr_free(&endpoint);
+    zconfig_destroy (&config);
+
     return 0;
 }

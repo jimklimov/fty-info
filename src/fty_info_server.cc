@@ -51,6 +51,26 @@ struct _fty_info_server_t {
     topologyresolver_t* resolver;
 };
 
+// Configuration accessors
+// FIXME: why do we need that? zconfig_get should already do this, no?
+const char*
+s_get (zconfig_t *config, const char* key, std::string &dfl) {
+    assert (config);
+    char *ret = zconfig_get (config, key, dfl.c_str());
+    if (!ret || streq (ret, ""))
+        return (char*)dfl.c_str();
+    return ret;
+}
+
+const char*
+s_get (zconfig_t *config, const char* key, const char*dfl) {
+    assert (config);
+    char *ret = zconfig_get (config, key, dfl);
+    if (!ret || streq (ret, ""))
+        return dfl;
+    return ret;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 

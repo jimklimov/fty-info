@@ -22,12 +22,23 @@
 #ifndef FTY_INFO_H_H_INCLUDED
 #define FTY_INFO_H_H_INCLUDED
 
+#include <iostream>
+#include <sstream>
+#include <cstddef>
+#include <map>
+
+using namespace std;
+
 //  Include the project library file
 #include "fty_info_library.h"
 
 //  Add your own public definitions here, if you need them
 #define FTY_INFO_AGENT "fty-info"
 #define FTY_INFO_CMD "INFO"
+#define DEFAULT_ANNOUNCE_INTERVAL_SEC   60
+
+// TODO: get from config
+// #define TIMEOUT_MS -1   //wait infinitely
 
 #define INFO_ID        "id"
 #define INFO_UUID      "uuid"
@@ -49,5 +60,11 @@
 #define INFO_PROTOCOL_FORMAT "protocol-format"
 #define INFO_TYPE      "type"
 #define INFO_TXTVERS   "txtvers"
+
+// Config file accessors
+const char* s_get (zconfig_t *config, const char* key, std::string &dfl);
+const char* s_get (zconfig_t *config, const char* key, const char*dfl);
+
+#define my_zsys_debug(verbose, ...) { if (verbose) zsys_debug (__VA_ARGS__); }
 
 #endif

@@ -22,7 +22,7 @@ EnvironmentFile=-@sysconfdir@/default/bios__%n.conf
 EnvironmentFile=-@sysconfdir@/default/fty
 EnvironmentFile=-@sysconfdir@/default/fty__%n.conf
 Environment="prefix=@prefix@"
-ExecStart=@prefix@/bin/fty-info @sysconfdir@/@PACKAGE@/fty-info.cfg
+ExecStart=@prefix@/bin/fty-info -c @sysconfdir@/@PACKAGE@/fty-info.cfg
 
 [Install]
 WantedBy=bios.target
