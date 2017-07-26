@@ -1,9 +1,12 @@
 #   fty-info configuration
-# This is a skeleton created by zproject.
-# You can add hand-written code here.
 
 server
     timeout = 10000     #   Client connection timeout, msec
     background = 0      #   Run as background process
     workdir = .         #   Working directory for daemon
     verbose = 0         #   Do verbose logging of activity?
+    announce = 60       #   Frequiency of announcements (in seconds)
+
+malamute
+    endpoint = ipc://@/malamute #   Malamute endpoint
+    address = fty-info          #   Agent address
