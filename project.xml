@@ -35,6 +35,7 @@
 
     <class name = "topologyresolver" private="1">Class for asset location recursive resolving</class>
     <class name = "ftyinfo" private="1" selftest="0">Class for keeping fty information</class>
+    <class name = "linuxinfo" selftest="0">Class for finding out Linux system info</class>
     <class name = "fty-info-server">42ity info server</class>
 
     <main  name = "fty-info" service = "1">Agent which returns rack controller information</main>

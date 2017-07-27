@@ -45,6 +45,7 @@ typedef struct _ftyinfo_t ftyinfo_t;
 #endif
 
 //  Internal API
+
 #include "topologyresolver.h"
 #include "ftyinfo.h"
 
