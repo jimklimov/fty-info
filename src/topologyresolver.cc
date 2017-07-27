@@ -98,7 +98,7 @@ static bool s_is_this_me (fty_proto_t *asset)
         //are we creating/updating a rack controller?
         const char *type = fty_proto_aux_string (asset, "type", "");
         const char *subtype = fty_proto_aux_string (asset, "subtype", "");
-        if (streq (type, "device") || streq (subtype, "rackcontroller")) {
+        if (streq (type, "device") && streq (subtype, "rackcontroller")) {
             auto ifaces = s_local_addresses ();
             zhash_t *ext = fty_proto_ext (asset);
 
