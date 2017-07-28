@@ -85,6 +85,7 @@ info_server_new (char *name)
     self->name=strdup(name);
     self->client = mlm_client_new ();
     self->announce_client = mlm_client_new ();
+    self->info_client = mlm_client_new ();
     self->verbose=false;
     self->first_announce=true;
     self->announce_test=false;
@@ -102,6 +103,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         //  Free class properties here
         mlm_client_destroy (&self->client);
         mlm_client_destroy (&self->announce_client);
+        mlm_client_destroy (&self->info_client);
         zstr_free(&self->name);
         zstr_free(&self->endpoint);
         topologyresolver_destroy (&self->resolver);
@@ -264,17 +266,37 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else
     if (streq (command, "PRODUCER")) {
         char* stream = zmsg_popstr (message);
-        self->announce_test=streq(stream,"ANNOUNCE-TEST");
-        int rv = mlm_client_connect (self->announce_client, self->endpoint, 1000, "fty_info_announce");
-        if (rv == -1)
-                zsys_error("fty_info_announce : mlm_client_connect failed\n");
-        rv = mlm_client_set_producer (self->announce_client, stream);
-        if (rv == -1)
-            zsys_error ("%s: can't set producer on stream '%s'",
-                    self->name, stream);
-        else
-            //do the first announce
-            s_publish_announce(self);
+        if (streq (stream, "ANNOUNCE-TEST") || streq (stream, "ANNOUNCE")) {
+            self->announce_test = streq(stream,"ANNOUNCE-TEST");
+            int rv = mlm_client_connect (self->announce_client, self->endpoint, 1000, "fty_info_announce");
+            if (rv == -1)
+                    zsys_error("fty_info_announce : mlm_client_connect failed\n");
+            rv = mlm_client_set_producer (self->announce_client, stream);
+            if (rv == -1)
+                zsys_error ("%s: can't set producer on stream '%s'",
+                        self->name, stream);
+            else
+                //do the first announce
+                s_publish_announce(self);
+        }
+        else if (streq (stream, FTY_PROTO_STREAM_METRICS)) {
+            int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxinfo");
+            if (rv == -1)
+                    zsys_error("fty_info_linuxinfo : mlm_client_connect failed\n");
+            rv = mlm_client_set_producer (self->info_client, stream);
+            if (rv == -1)
+                zsys_error ("%s: can't set producer on stream '%s'",
+                        self->name, stream);
+            else
+                //publish the first metrics
+                s_publish_linuxinfo (self);
+        }
+        else {
+            int rv = mlm_client_set_producer (self->client, stream);
+            if (rv == -1)
+                zsys_error ("%s: can't set producer on stream '%s'",
+                        self->name, stream);
+        }
         zstr_free (&stream);
     }
     else if (streq (command, "LINUXINFOFREQ")) {
