@@ -1,5 +1,5 @@
 /*  =========================================================================
-    linuxinfo - Class for finding out Linux system info
+    linuxmetric - Class for finding out Linux system info
 
     Copyright (C) 2014 - 2017 Eaton
 
@@ -21,17 +21,18 @@
 
 /*
 @header
-    linuxinfo - Class for finding out Linux system info
+    linuxmetric - Class for finding out Linux system info
 @discuss
 @end
 */
 
 #include "fty_info_classes.h"
 
+
 ///////////////////////////////////////////
 // Static functions which get metrics values
 
-static linuxinfo_t *
+static linuxmetric_t *
 s_uptime (void)
 {
     const char *path = "/proc/uptime";
@@ -43,7 +44,7 @@ s_uptime (void)
     double uptime, idletime;
     fscanf (uptimef, "%lf %lf", &uptime, &idletime);
 
-    linuxinfo_t *uptime_info = linuxinfo_new ();
+    linuxmetric_t *uptime_info = linuxmetric_new ();
     uptime_info->type = "uptime";
     uptime_info->value = uptime;
     uptime_info->unit = "sec";
@@ -52,12 +53,12 @@ s_uptime (void)
 }
 
 //  --------------------------------------------------------------------------
-//  Create a new linuxinfo
+//  Create a new linuxmetric
 
-linuxinfo_t *
-linuxinfo_new (void)
+linuxmetric_t *
+linuxmetric_new (void)
 {
-    linuxinfo_t *self = (linuxinfo_t *) zmalloc (sizeof (linuxinfo_t));
+    linuxmetric_t *self = (linuxmetric_t *) zmalloc (sizeof (linuxmetric_t));
     assert (self);
     //  Initialize class properties here
     return self;
@@ -65,14 +66,14 @@ linuxinfo_new (void)
 
 
 //  --------------------------------------------------------------------------
-//  Destroy the linuxinfo
+//  Destroy the linuxmetric
 
 void
-linuxinfo_destroy (linuxinfo_t **self_p)
+linuxmetric_destroy (linuxmetric_t **self_p)
 {
     assert (self_p);
     if (*self_p) {
-        linuxinfo_t *self = *self_p;
+        linuxmetric_t *self = *self_p;
         //  Free class properties here
         //  Free object itself
         free (self);
@@ -84,11 +85,11 @@ linuxinfo_destroy (linuxinfo_t **self_p)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxinfo_get_all (void)
+linuxmetric_get_all (void)
 {
     zlistx_t *info = zlistx_new ();
-    zlistx_set_destructor (info, (void (*)(void**)) linuxinfo_destroy);
-    linuxinfo_t *uptime = s_uptime ();
+    zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
+    linuxmetric_t *uptime = s_uptime ();
     zlistx_add_end (info, uptime);
     return info;
 }

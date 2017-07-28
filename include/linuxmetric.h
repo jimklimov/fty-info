@@ -1,5 +1,5 @@
 /*  =========================================================================
-    linuxinfo - Class for finding out Linux system info
+    linuxmetric - Class for finding out Linux system info
 
     Copyright (C) 2014 - 2017 Eaton
 
@@ -19,32 +19,31 @@
     =========================================================================
 */
 
-#ifndef LINUXINFO_H_INCLUDED
-#define LINUXINFO_H_INCLUDED
+#ifndef LINUXMETRIC_H_INCLUDED
+#define LINUXMETRIC_H_INCLUDED
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct _linuxinfo_t {
+struct _linuxmetric_t {
     const char *type;
     double value;
     const char *unit;
 };
 
-
 //  @interface
-//  Create a new linuxinfo
-FTY_INFO_EXPORT linuxinfo_t *
-    linuxinfo_new (void);
+//  Create a new linuxmetric
+FTY_INFO_EXPORT linuxmetric_t *
+    linuxmetric_new (void);
 
-//  Destroy the linuxinfo
+//  Destroy the linuxmetric
 FTY_INFO_EXPORT void
-    linuxinfo_destroy (linuxinfo_t **self_p);
+    linuxmetric_destroy (linuxmetric_t **self_p);
 
 // Create zlistx containing all Linux system info
 FTY_INFO_EXPORT zlistx_t *
-    linuxinfo_get_all (void);
+    linuxmetric_get_all (void);
 
 //  @end
 

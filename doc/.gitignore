@@ -11,8 +11,8 @@
 *.xml7
 
 # Ignore the source doc texts generated from program sources
-linuxinfo.txt
-linuxinfo.doc
+linuxmetric.txt
+linuxmetric.doc
 fty_info_server.txt
 fty_info_server.doc
 fty-info.txt

@@ -50,7 +50,7 @@ struct _fty_info_server_t {
     bool first_announce;
     bool announce_test;
     topologyresolver_t* resolver;
-    int linuxinfo_freq;
+    int linuxmetrics_freq;
 };
 
 // Configuration accessors
@@ -206,18 +206,18 @@ s_publish_announce(fty_info_server_t  * self)
 }
 
 //  --------------------------------------------------------------------------
-//  publish linuxinfo metrics on STREAM METRICS
+//  publish Linux system info on STREAM METRICS
 static void
-s_publish_linuxinfo (fty_info_server_t  * self)
+s_publish_linuxmetrics (fty_info_server_t  * self)
 {
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxinfo_get_all ();
-    int ttl = 3 * self->linuxinfo_freq; // in seconds
+    zlistx_t *info = linuxmetric_get_all ();
+    int ttl = 3 * self->linuxmetrics_freq; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
 
-    linuxinfo_t *metric = (linuxinfo_t *) zlistx_first (info);
+    linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
         const char *value = zsys_sprintf ("%lf", metric->value);
         zsys_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
@@ -237,7 +237,7 @@ s_publish_linuxinfo (fty_info_server_t  * self)
         else {
             zsys_error ("Can't publish metric %s on METRICS stream", metric->type);
         }
-        metric = (linuxinfo_t *) zlistx_next (info);
+        metric = (linuxmetric_t *) zlistx_next (info);
     }
 
     zlistx_destroy (&info);
@@ -311,16 +311,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 s_publish_announce(self);
         }
         else if (streq (stream, FTY_PROTO_STREAM_METRICS)) {
-            int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxinfo");
+            int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
-                    zsys_error("fty_info_linuxinfo : mlm_client_connect failed\n");
+                    zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
             rv = mlm_client_set_producer (self->info_client, stream);
             if (rv == -1)
                 zsys_error ("%s: can't set producer on stream '%s'",
                         self->name, stream);
             else
                 //publish the first metrics
-                s_publish_linuxinfo (self);
+                s_publish_linuxmetrics (self);
         }
         else {
             int rv = mlm_client_set_producer (self->client, stream);
@@ -333,14 +333,14 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else if (streq (command, "LINUXINFOFREQ")) {
         char *freq = zmsg_popstr (message);
         zsys_info ("Will be publishing metrics each %s seconds", freq);
-        self->linuxinfo_freq = (int) strtol (freq, NULL, 10);
+        self->linuxmetrics_freq = (int) strtol (freq, NULL, 10);
         zstr_free (&freq);
     }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
     }
     else if (streq (command, "LINUXINFO")) {
-        s_publish_linuxinfo (self);
+        s_publish_linuxmetrics (self);
     }
     else
         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
