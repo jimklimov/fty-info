@@ -210,8 +210,39 @@ s_publish_announce(fty_info_server_t  * self)
 static void
 s_publish_linuxinfo (fty_info_server_t  * self)
 {
-}
+    if(!mlm_client_connected(self->info_client))
+        return;
 
+    zlistx_t *info = linuxinfo_get_all ();
+    int ttl = 3 * self->linuxinfo_freq; // in seconds
+    const char *rc_iname = topologyresolver_id (self->resolver);
+
+    linuxinfo_t *metric = (linuxinfo_t *) zlistx_first (info);
+    while (metric) {
+        const char *value = zsys_sprintf ("%lf", metric->value);
+        zsys_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
+        zmsg_t *msg = fty_proto_encode_metric (
+                NULL,
+                ::time (NULL),
+                ttl,
+                metric->type,
+                rc_iname,
+                value,
+                metric->unit
+                );
+        const char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
+        if (mlm_client_send (self->info_client, subject, &msg) != -1) {
+            zsys_info ("Metric %s published on METRICS stream", metric->type);
+        }
+        else {
+            zsys_error ("Can't publish metric %s on METRICS stream", metric->type);
+        }
+        metric = (linuxinfo_t *) zlistx_next (info);
+    }
+
+    zlistx_destroy (&info);
+
+}
 
 //  --------------------------------------------------------------------------
 //  process pipe message
@@ -301,6 +332,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     }
     else if (streq (command, "LINUXINFOFREQ")) {
         char *freq = zmsg_popstr (message);
+        zsys_info ("Will be publishing metrics each %s seconds", freq);
         self->linuxinfo_freq = (int) strtol (freq, NULL, 10);
         zstr_free (&freq);
     }
