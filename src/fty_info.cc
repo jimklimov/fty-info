@@ -29,6 +29,13 @@
 #include "fty_info_classes.h"
 
 static int
+s_linuxinfo_event (zloop_t *loop, int timer_id, void *output)
+{
+    zstr_send (output, "LINUXINFO");
+    return 0;
+}
+
+static int
 s_announce_event (zloop_t *loop, int timer_id, void *output)
 {
     zstr_send (output, "ANNOUNCE");
@@ -135,13 +142,24 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
+    zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
+    // can be read from config file later
+    int linuxinfo_freq = 30;
+    char *linuxinfo_freq_str = zsys_sprintf ("%d", linuxinfo_freq);
+    zstr_sendx (server, "LINUXINFOFREQ", linuxinfo_freq_str, NULL);
 
     zloop_t *announce = zloop_new();
     zloop_timer (announce, announcing * 1000, 0, s_announce_event, server);
     zloop_start (announce);
 
+    zloop_t *linuxinfo = zloop_new();
+    zloop_timer (linuxinfo, linuxinfo_freq * 1000, 0, s_linuxinfo_event, server);
+    zloop_start (linuxinfo);
+
     // Cleanup
+    zloop_destroy (&linuxinfo);
     zloop_destroy (&announce);
+    zstr_free (&linuxinfo_freq_str);
     zactor_destroy (&server);
     zstr_free(&actor_name);
     zstr_free(&endpoint);
