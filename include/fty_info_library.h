@@ -77,6 +77,8 @@
 //  These classes are stable or legacy and built in all releases
 //  Draft classes are by default not built in stable releases
 #ifdef FTY_INFO_BUILD_DRAFT_API
+typedef struct _linuxinfo_t linuxinfo_t;
+#define LINUXINFO_T_DEFINED
 typedef struct _fty_info_server_t fty_info_server_t;
 #define FTY_INFO_SERVER_T_DEFINED
 #endif // FTY_INFO_BUILD_DRAFT_API
@@ -84,6 +86,7 @@ typedef struct _fty_info_server_t fty_info_server_t;
 
 //  Public classes, each with its own header file
 #ifdef FTY_INFO_BUILD_DRAFT_API
+#include "linuxinfo.h"
 #include "fty_info_server.h"
 #endif // FTY_INFO_BUILD_DRAFT_API
 

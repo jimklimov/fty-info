@@ -45,10 +45,12 @@ struct _fty_info_server_t {
     char* endpoint;
     mlm_client_t *client;
     mlm_client_t *announce_client;
+    mlm_client_t *info_client;
     bool verbose;
     bool first_announce;
     bool announce_test;
     topologyresolver_t* resolver;
+    int linuxinfo_freq;
 };
 
 // Configuration accessors
@@ -200,6 +202,15 @@ s_publish_announce(fty_info_server_t  * self)
     }
     ftyinfo_destroy (&info);
 }
+
+//  --------------------------------------------------------------------------
+//  publish linuxinfo metrics on STREAM METRICS
+static void
+s_publish_linuxinfo (fty_info_server_t  * self)
+{
+}
+
+
 //  --------------------------------------------------------------------------
 //  process pipe message
 //  return true means continue, false means TERM
@@ -266,8 +277,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             s_publish_announce(self);
         zstr_free (&stream);
     }
+    else if (streq (command, "LINUXINFOFREQ")) {
+        char *freq = zmsg_popstr (message);
+        self->linuxinfo_freq = (int) strtol (freq, NULL, 10);
+        zstr_free (&freq);
+    }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
+    }
+    else if (streq (command, "LINUXINFO")) {
+        s_publish_linuxinfo (self);
     }
     else
         zsys_error ("fty-info: Unknown actor command: %s.\n", command);

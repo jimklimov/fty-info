@@ -97,6 +97,7 @@ This package contains development files for fty-info: agent which returns rack c
 %{_mandir}/man7/*
 
 %prep
+
 %setup -q
 
 %build

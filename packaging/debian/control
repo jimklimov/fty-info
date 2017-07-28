@@ -21,7 +21,7 @@ Source:         fty-info
 Section:        net
 Priority:       optional
 Maintainer:     fty-info Developers <eatonipcopensource@eaton.com>
-Standards-Version: 3.9.7
+Standards-Version: 4.0.0
 Build-Depends: debhelper (>= 9),
     pkg-config,
     libzmq3-dev,
@@ -37,27 +37,31 @@ Build-Depends: debhelper (>= 9),
 Package: libfty-info1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: agent which returns rack controller information shared library
- This package contains shared library for fty-info: agent which returns rack controller information
+Description: fty-info shared library
+ This package contains shared library for fty-info:
+ agent which returns rack controller information
 
 Package: libfty-info-dev
 Architecture: any
 Section: libdevel
 Depends:
+    ${misc:Depends},
     libzmq3-dev,
     libczmq-dev,
     libmlm-dev,
     libcxxtools-dev,
     libfty-proto-dev,
     libfty-info1 (= ${binary:Version})
-Description: agent which returns rack controller information development tools
- This package contains development files for fty-info: agent which returns rack controller information
+Description: fty-info development tools
+ This package contains development files for fty-info:
+ agent which returns rack controller information
 
 Package: fty-info
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: agent which returns rack controller information
- Main package for fty-info: agent which returns rack controller information
+Description: runnable binaries from fty-info
+ Main package for fty-info:
+ agent which returns rack controller information
 
 Package: fty-info-dbg
 Architecture: any
@@ -66,6 +70,6 @@ Priority: extra
 Depends:
     fty-info (= ${binary:Version}),
     ${misc:Depends}
-Description: agent which returns rack controller information debugging symbols
- This package contains the debugging symbols for fty-info : agent which returns rack controller information.
-
+Description: fty-info debugging symbols
+ This package contains the debugging symbols for fty-info:
+ agent which returns rack controller information.
