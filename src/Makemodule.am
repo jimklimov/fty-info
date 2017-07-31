@@ -18,7 +18,7 @@ include_HEADERS = \
 
 if ENABLE_DRAFTS
 include_HEADERS += \
-    include/linuxinfo.h \
+    include/linuxmetric.h \
     include/fty_info_server.h
 
 endif
@@ -29,7 +29,7 @@ src_libfty_info_la_SOURCES = \
 
 if ENABLE_DRAFTS
 src_libfty_info_la_SOURCES += \
-    src/linuxinfo.cc \
+    src/linuxmetric.cc \
     src/fty_info_server.cc
 
 endif

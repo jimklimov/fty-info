@@ -148,17 +148,13 @@ int main (int argc, char *argv [])
     char *linuxinfo_freq_str = zsys_sprintf ("%d", linuxinfo_freq);
     zstr_sendx (server, "LINUXINFOFREQ", linuxinfo_freq_str, NULL);
 
-    zloop_t *announce = zloop_new();
-    zloop_timer (announce, announcing * 1000, 0, s_announce_event, server);
-    zloop_start (announce);
-
-    zloop_t *linuxinfo = zloop_new();
-    zloop_timer (linuxinfo, linuxinfo_freq * 1000, 0, s_linuxinfo_event, server);
-    zloop_start (linuxinfo);
+    zloop_t *timer_loop = zloop_new();
+    zloop_timer (timer_loop, announcing * 1000, 0, s_announce_event, server);
+    zloop_timer (timer_loop, linuxinfo_freq * 1000, 0, s_linuxinfo_event, server);
+    zloop_start (timer_loop);
 
     // Cleanup
-    zloop_destroy (&linuxinfo);
-    zloop_destroy (&announce);
+    zloop_destroy (&timer_loop);
     zstr_free (&linuxinfo_freq_str);
     zactor_destroy (&server);
     zstr_free(&actor_name);
