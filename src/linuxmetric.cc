@@ -177,6 +177,39 @@ s_cpu_temperature (void)
     return NULL;
 }
 
+static zlistx_t *
+s_meminfo (void)
+{
+    zlistx_t *meminfo = zlistx_new ();
+
+    std::string line_total = s_getline_by_name ("/proc/meminfo", "MemTotal:");
+    double memory_total = s_get_field (line_total, 2);
+
+    linuxmetric_t *memory_total_info = linuxmetric_new ();
+    memory_total_info->type = "total.memory";
+    memory_total_info->value = memory_total;
+    memory_total_info->unit = "kB";
+    zlistx_add_end (meminfo, memory_total_info);
+
+    std::string line_free = s_getline_by_name ("/proc/meminfo", "MemFree:");
+    double memory_free = s_get_field (line_free, 2);
+    double memory_used = memory_total - memory_free;
+
+    linuxmetric_t *memory_used_info = linuxmetric_new ();
+    memory_used_info->type = "used.memory";
+    memory_used_info->value = memory_used;
+    memory_used_info->unit = "kB";
+    zlistx_add_end (meminfo, memory_used_info);
+
+    linuxmetric_t *memory_usage_info = linuxmetric_new ();
+    memory_usage_info->type = "usage.memory";
+    memory_usage_info->value = 100 * (memory_used / memory_total);
+    memory_usage_info->unit = "%";
+    zlistx_add_end (meminfo, memory_usage_info);
+
+    return meminfo;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new linuxmetric
 
@@ -188,7 +221,6 @@ linuxmetric_new (void)
     //  Initialize class properties here
     return self;
 }
-
 
 //  --------------------------------------------------------------------------
 //  Destroy the linuxmetric
@@ -214,6 +246,7 @@ linuxmetric_get_all (void)
 {
     zlistx_t *info = zlistx_new ();
     zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
+
     linuxmetric_t *uptime = s_uptime ();
     zlistx_add_end (info, uptime);
     linuxmetric_t *cpu_usage = s_cpu_usage ();
@@ -221,5 +254,13 @@ linuxmetric_get_all (void)
     linuxmetric_t *cpu_temperature = s_cpu_temperature ();
     if (cpu_temperature != NULL)
         zlistx_add_end (info, cpu_temperature);
+
+    zlistx_t *meminfo = s_meminfo ();
+    linuxmetric_t *mem_metric = (linuxmetric_t *) zlistx_first (meminfo);
+    while (mem_metric) {
+        zlistx_add_end (info, mem_metric);
+        mem_metric = (linuxmetric_t *) zlistx_next (meminfo);
+    }
+    zlistx_destroy (&meminfo);
     return info;
 }
