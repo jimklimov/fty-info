@@ -56,6 +56,8 @@ usage(){
 int main (int argc, char *argv [])
 {
     int announcing = DEFAULT_ANNOUNCE_INTERVAL_SEC;
+    int linuxmetrics_interval = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
+    const char *str_linuxmetrics_interval = NULL;
     char *config_file = NULL;
     zconfig_t *config = NULL;
     char* actor_name = NULL;
@@ -118,6 +120,12 @@ int main (int argc, char *argv [])
             announcing = atoi(str_announcing);
         }
 
+	 // Linux metrics publishing interval (in seconds)
+        str_linuxmetrics_interval = s_get (config, "server/linuxmetrics", "30");
+        if (str_linuxmetrics_interval) {
+            linuxmetrics_interval = atoi (str_linuxmetrics_interval);
+        }
+
         if (endpoint) zstr_free(&endpoint);
         endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
         actor_name = strdup(s_get (config, "malamute/address", NULL));
@@ -143,10 +151,7 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
     zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
-    // can be read from config file later
-    int linuxmetrics_interval = 30;
-    char *linuxmetrics_interval_str = zsys_sprintf ("%d", linuxmetrics_interval);
-    zstr_sendx (server, "LINUXMETRICSINTERVAL", linuxmetrics_interval_str, NULL);
+    zstr_sendx (server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
 
     zloop_t *timer_loop = zloop_new();
     zloop_timer (timer_loop, announcing * 1000, 0, s_announce_event, server);
@@ -155,7 +160,6 @@ int main (int argc, char *argv [])
 
     // Cleanup
     zloop_destroy (&timer_loop);
-    zstr_free (&linuxmetrics_interval_str);
     zactor_destroy (&server);
     zstr_free(&actor_name);
     zstr_free(&endpoint);
