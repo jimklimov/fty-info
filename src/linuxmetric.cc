@@ -335,6 +335,33 @@ static zlistx_t *
     return network_usage_info;
 }
 
+static linuxmetric_t *
+    s_network_error_ratio
+    (const char *interface,
+     const char *direction)
+{
+    if (is_interface_online (interface)) {
+        char *errors_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_errors", interface, direction);
+        std::string errors_line = s_getline_by_number (errors_path, 1);
+        double errors = s_get_field (errors_line, 1);
+
+        char *packets_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_packets", interface, direction);
+        std::string packets_line = s_getline_by_number (packets_path, 1);
+        double packets = s_get_field (packets_line, 1);
+
+        linuxmetric_t *error_info = linuxmetric_new ();
+        char *error_type = zsys_sprintf ("%s_error_ratio.%s", direction, interface);
+        error_info->type = strdup (error_type);
+        error_info->value = errors / packets;
+        error_info->unit = "";
+
+        zstr_free (&packets_path);
+        zstr_free (&errors_path);
+        return error_info;
+    }
+    return NULL;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new linuxmetric
 
@@ -458,6 +485,30 @@ linuxmetric_get_all (int freq)
         network_usage_metric = (linuxmetric_t *) zlistx_next (tx_lan3);
     }
     zlistx_destroy (&tx_lan3);
+
+    linuxmetric_t *rx_lan1_error = s_network_error_ratio ("LAN1", "rx");
+    if (rx_lan1_error != NULL)
+        zlistx_add_end (info, rx_lan1_error);
+
+    linuxmetric_t *rx_lan2_error = s_network_error_ratio ("LAN2", "rx");
+    if (rx_lan2_error != NULL)
+        zlistx_add_end (info, rx_lan2_error);
+
+    linuxmetric_t *rx_lan3_error = s_network_error_ratio ("LAN3", "rx");
+    if (rx_lan3_error != NULL)
+        zlistx_add_end (info, rx_lan3_error);
+
+    linuxmetric_t *tx_lan1_error = s_network_error_ratio ("LAN1", "tx");
+    if (tx_lan1_error != NULL)
+        zlistx_add_end (info, tx_lan1_error);
+
+    linuxmetric_t *tx_lan2_error = s_network_error_ratio ("LAN2", "tx");
+    if (tx_lan2_error != NULL)
+        zlistx_add_end (info, tx_lan2_error);
+
+    linuxmetric_t *tx_lan3_error = s_network_error_ratio ("LAN3", "tx");
+    if (tx_lan3_error != NULL)
+        zlistx_add_end (info, tx_lan3_error);
 
     return info;
 }
