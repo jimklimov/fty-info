@@ -30,6 +30,7 @@
 #include <fstream>
 #include <sstream>
 #include <limits>
+#include <sys/statvfs.h>
 
 #include "fty_info_classes.h"
 
@@ -210,6 +211,72 @@ s_meminfo (void)
     return meminfo;
 }
 
+static zlistx_t *
+s_sdcard_info (void)
+{
+    zlistx_t *sdcard_info = zlistx_new ();
+
+    struct statvfs buf;
+    statvfs ("/var", &buf);
+    int to_MB = 1024 * 1024;
+
+    double sdcard_total = buf.f_blocks * buf.f_frsize;
+    linuxmetric_t *sdcard_total_info = linuxmetric_new ();
+    sdcard_total_info->type = "total.sd-card";
+    sdcard_total_info->value = sdcard_total / to_MB;
+    sdcard_total_info->unit = "MB";
+    zlistx_add_end (sdcard_info, sdcard_total_info);
+
+    double sdcard_used = sdcard_total - buf.f_bsize * buf.f_bfree;
+    linuxmetric_t *sdcard_used_info = linuxmetric_new ();
+    sdcard_used_info->type = "used.sd-card";
+    sdcard_used_info->value = sdcard_used / to_MB;
+    sdcard_used_info->unit = "MB";
+    zlistx_add_end (sdcard_info, sdcard_used_info);
+
+    linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
+    sdcard_usage_info->type = "usage.sd-card";
+    sdcard_usage_info->value = 100 * (sdcard_used / sdcard_total);
+    sdcard_usage_info->unit = "%";
+    zlistx_add_end (sdcard_info, sdcard_usage_info);
+
+    return sdcard_info;
+}
+
+static zlistx_t *
+s_flash_info (void)
+{
+    zlistx_t *flash_info = zlistx_new ();
+
+    struct statvfs buf;
+    statvfs ("/", &buf);
+    int to_MB = 1024 * 1024;
+
+    double flash_total = buf.f_blocks * buf.f_frsize;
+    linuxmetric_t *flash_total_info = linuxmetric_new ();
+    flash_total_info->type = "total.flash";
+    flash_total_info->value = flash_total / to_MB;
+    flash_total_info->unit = "MB";
+    zlistx_add_end (flash_info, flash_total_info);
+
+    double flash_used = flash_total - buf.f_bsize * buf.f_bfree;
+    linuxmetric_t *flash_used_info = linuxmetric_new ();
+    flash_used_info->type = "used.flash";
+    flash_used_info->value = flash_used / to_MB;
+    flash_used_info->unit = "MB";
+    zlistx_add_end (flash_info, flash_used_info);
+
+    //df -h computes "/" usage from f_bavail, let's do the same
+    double flash_used_nonroot = flash_total - buf.f_bsize * buf.f_bavail;
+    linuxmetric_t *flash_usage_info = linuxmetric_new ();
+    flash_usage_info->type = "usage.flash";
+    flash_usage_info->value = 100 * (flash_used_nonroot / flash_total);
+    flash_usage_info->unit = "%";
+    zlistx_add_end (flash_info, flash_usage_info);
+
+    return flash_info;
+}
+
 //  --------------------------------------------------------------------------
 //  Create a new linuxmetric
 
@@ -262,5 +329,21 @@ linuxmetric_get_all (void)
         mem_metric = (linuxmetric_t *) zlistx_next (meminfo);
     }
     zlistx_destroy (&meminfo);
+
+    zlistx_t *sdcard_info = s_sdcard_info ();
+    linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
+    while (sdcard_metric) {
+        zlistx_add_end (info, sdcard_metric);
+        sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
+    }
+    zlistx_destroy (&sdcard_info);
+
+    zlistx_t *flash_info = s_flash_info ();
+    linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
+    while (flash_metric) {
+        zlistx_add_end (info, flash_metric);
+        flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+    }
+    zlistx_destroy (&flash_info);
     return info;
 }
