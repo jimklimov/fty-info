@@ -213,7 +213,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxmetric_get_all ();
+    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_freq);
     int ttl = 3 * self->linuxmetrics_freq; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
 
