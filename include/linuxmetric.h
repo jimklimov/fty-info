@@ -43,7 +43,7 @@ FTY_INFO_EXPORT void
 
 // Create zlistx containing all Linux system info
 FTY_INFO_EXPORT zlistx_t *
-    linuxmetric_get_all (void);
+    linuxmetric_get_all (int freq);
 
 //  @end
 
