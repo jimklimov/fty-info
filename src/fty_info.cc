@@ -121,7 +121,7 @@ int main (int argc, char *argv [])
         }
 
 	 // Linux metrics publishing interval (in seconds)
-        str_linuxmetrics_interval = s_get (config, "server/linuxmetrics", "30");
+        str_linuxmetrics_interval = s_get (config, "server/check_interval", "30");
         if (str_linuxmetrics_interval) {
             linuxmetrics_interval = atoi (str_linuxmetrics_interval);
         }
