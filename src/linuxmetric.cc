@@ -301,7 +301,7 @@ static zlistx_t *
     s_network_usage
     (const char *interface,
      const char *direction,
-     int freq,
+     int interval,
      double *bytes)
 {
     double last = *bytes;
@@ -316,7 +316,7 @@ static zlistx_t *
         linuxmetric_t *bandwidth_info = linuxmetric_new ();
         char *bandwidth_type = zsys_sprintf ("%s_bandwidth.%s", direction, interface);
         bandwidth_info->type = strdup (bandwidth_type);
-        bandwidth_info->value = (*bytes - last) / freq;
+        bandwidth_info->value = (*bytes - last) / interval;
         bandwidth_info->unit = "Bps";
         zlistx_add_end (network_usage_info, bandwidth_info);
 
@@ -394,7 +394,7 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int freq)
+linuxmetric_get_all (int interval)
 {
     zlistx_t *info = zlistx_new ();
     zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
@@ -438,7 +438,7 @@ linuxmetric_get_all (int freq)
     static double txbytes_lan2;
     static double txbytes_lan3;
 
-    zlistx_t *rx_lan1 = s_network_usage ("LAN1", "rx", freq, &rxbytes_lan1);
+    zlistx_t *rx_lan1 = s_network_usage ("LAN1", "rx", interval, &rxbytes_lan1);
     linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx_lan1);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
@@ -446,7 +446,7 @@ linuxmetric_get_all (int freq)
     }
     zlistx_destroy (&rx_lan1);
 
-    zlistx_t *rx_lan2 = s_network_usage ("LAN2", "rx", freq, &rxbytes_lan2);
+    zlistx_t *rx_lan2 = s_network_usage ("LAN2", "rx", interval, &rxbytes_lan2);
     network_usage_metric = (linuxmetric_t *) zlistx_first (rx_lan2);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
@@ -454,7 +454,7 @@ linuxmetric_get_all (int freq)
     }
     zlistx_destroy (&rx_lan2);
 
-    zlistx_t *rx_lan3 = s_network_usage ("LAN3", "rx", freq, &rxbytes_lan3);
+    zlistx_t *rx_lan3 = s_network_usage ("LAN3", "rx", interval, &rxbytes_lan3);
     network_usage_metric = (linuxmetric_t *) zlistx_first (rx_lan3);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
@@ -462,7 +462,7 @@ linuxmetric_get_all (int freq)
     }
     zlistx_destroy (&rx_lan3);
 
-    zlistx_t *tx_lan1 = s_network_usage ("LAN1", "tx", freq, &txbytes_lan1);
+    zlistx_t *tx_lan1 = s_network_usage ("LAN1", "tx", interval, &txbytes_lan1);
     network_usage_metric = (linuxmetric_t *) zlistx_first (tx_lan1);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
@@ -470,7 +470,7 @@ linuxmetric_get_all (int freq)
     }
     zlistx_destroy (&tx_lan1);
 
-    zlistx_t *tx_lan2 = s_network_usage ("LAN2", "tx", freq, &txbytes_lan2);
+    zlistx_t *tx_lan2 = s_network_usage ("LAN2", "tx", interval, &txbytes_lan2);
     network_usage_metric = (linuxmetric_t *) zlistx_first (tx_lan2);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
@@ -478,7 +478,7 @@ linuxmetric_get_all (int freq)
     }
     zlistx_destroy (&tx_lan2);
 
-    zlistx_t *tx_lan3 = s_network_usage ("LAN3", "tx", freq, &txbytes_lan3);
+    zlistx_t *tx_lan3 = s_network_usage ("LAN3", "tx", interval, &txbytes_lan3);
     network_usage_metric = (linuxmetric_t *) zlistx_first (tx_lan3);
     while (network_usage_metric) {
         zlistx_add_end (info, network_usage_metric);
