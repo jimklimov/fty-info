@@ -50,7 +50,7 @@ struct _fty_info_server_t {
     bool first_announce;
     bool announce_test;
     topologyresolver_t* resolver;
-    int linuxmetrics_freq;
+    int linuxmetrics_interval;
 };
 
 // Configuration accessors
@@ -213,8 +213,8 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_freq);
-    int ttl = 3 * self->linuxmetrics_freq; // in seconds
+    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_interval);
+    int ttl = 3 * self->linuxmetrics_interval; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
 
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
@@ -330,16 +330,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         }
         zstr_free (&stream);
     }
-    else if (streq (command, "LINUXINFOFREQ")) {
-        char *freq = zmsg_popstr (message);
-        zsys_info ("Will be publishing metrics each %s seconds", freq);
-        self->linuxmetrics_freq = (int) strtol (freq, NULL, 10);
-        zstr_free (&freq);
+    else if (streq (command, "LINUXMETRICSINTERVAL")) {
+        char *interval = zmsg_popstr (message);
+        zsys_info ("Will be publishing metrics each %s seconds", interval);
+        self->linuxmetrics_interval = (int) strtol (interval, NULL, 10);
+        zstr_free (&interval);
     }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
     }
-    else if (streq (command, "LINUXINFO")) {
+    else if (streq (command, "LINUXMETRICS")) {
         s_publish_linuxmetrics (self);
     }
     else
