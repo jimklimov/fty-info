@@ -5,8 +5,8 @@ server
     background = 0      #   Run as background process
     workdir = .         #   Working directory for daemon
     verbose = 0         #   Do verbose logging of activity?
-    announce = 60       #   Frequiency of announcements (in seconds)
-
+    announce = 60       #   Frequency of announcements (in seconds)
+    check_interval = 30 #   Frequency of Linux metrics (in seconds)
 malamute
     endpoint = ipc://@/malamute #   Malamute endpoint
     address = fty-info          #   Agent address
