@@ -299,6 +299,14 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char* stream = zmsg_popstr (message);
         if (streq (stream, "ANNOUNCE-TEST") || streq (stream, "ANNOUNCE")) {
             self->announce_test = streq(stream,"ANNOUNCE-TEST");
+            if (!self->announce_test) {
+                zmsg_t *republish = zmsg_new ();
+                int rv = mlm_client_sendto (self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
+                if ( rv != 0) {
+                     zsys_error ("%s: cannot send REPUBLISH message", self->name);
+                     zmsg_destroy (&republish);
+                }
+            }
             int rv = mlm_client_connect (self->announce_client, self->endpoint, 1000, "fty_info_announce");
             if (rv == -1)
                     zsys_error("fty_info_announce : mlm_client_connect failed\n");
@@ -449,6 +457,7 @@ fty_info_server (zsock_t *pipe, void *args)
 
     zsock_signal (pipe, 0);
     zsys_info ("fty-info: Started");
+
 
     while (!zsys_interrupted)
     {
