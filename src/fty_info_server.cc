@@ -450,6 +450,13 @@ fty_info_server (zsock_t *pipe, void *args)
     zsock_signal (pipe, 0);
     zsys_info ("fty-info: Started");
 
+    zmsg_t *republish = zmsg_new ();
+    int rv = mlm_client_sendto (self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
+    if ( rv != 0) {
+         zsys_error ("%s: cannot send REPUBLISH message", self->name);
+         zmsg_destroy (&republish);
+    }
+
     while (!zsys_interrupted)
     {
         void *which = zpoller_wait (poller, TIMEOUT_MS);
