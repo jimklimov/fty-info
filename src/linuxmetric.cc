@@ -301,13 +301,13 @@ static zlistx_t *
     (const char *interface,
      const char *direction,
      int interval,
-     std::map<std::string,double> &network_bytes)
+     std::map<std::string,double> &network_history)
 {
     char *key = zsys_sprintf ("%s_%s", direction, interface);
     std::string skey(key);
-    auto pair_last = network_bytes.find (skey);
+    auto pair_last = network_history.find (skey);
     double value_last = 0;
-    if (pair_last != network_bytes.end ()) {
+    if (pair_last != network_history.end ()) {
         value_last = pair_last->second;
         zsys_debug ("%s:key found, value %lf", key, value_last);
     }
@@ -332,7 +332,7 @@ static zlistx_t *
     bytes_info->unit = "B";
     zlistx_add_end (network_usage_info, bytes_info);
 
-    network_bytes[skey] = bytes;
+    network_history[skey] = bytes;
 
     zstr_free (&bytes_type);
     zstr_free (&bandwidth_type);
@@ -345,8 +345,18 @@ static zlistx_t *
 static linuxmetric_t *
     s_network_error_ratio
     (const char *interface,
-     const char *direction)
+     const char *direction,
+     std::map<std::string,double> &network_history)
 {
+    char *key = zsys_sprintf ("%s_%s_errors", direction, interface);
+    std::string skey(key);
+    auto pair_last = network_history.find (skey);
+    double value_last = 0;
+    if (pair_last != network_history.end ()) {
+        value_last = pair_last->second;
+        zsys_debug ("%s:key found, value %lf", key, value_last);
+    }
+
     char *errors_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_errors", interface, direction);
     std::string errors_line = s_getline_by_number (errors_path, 1);
     double errors = s_get_field (errors_line, 1);
@@ -358,11 +368,15 @@ static linuxmetric_t *
     linuxmetric_t *error_info = linuxmetric_new ();
     char *error_type = zsys_sprintf ("%s_error_ratio.%s", direction, interface);
     error_info->type = strdup (error_type);
-    error_info->value = errors / packets;
-    error_info->unit = "";
+    error_info->value = 100 * (errors - value_last) / packets;
+    error_info->unit = "%";
 
+    network_history[skey] = errors;
+
+    zstr_free (&error_type);
     zstr_free (&packets_path);
     zstr_free (&errors_path);
+    zstr_free (&key);
     return error_info;
 }
 
@@ -398,7 +412,7 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int interval, std::map<std::string,double> &network_bytes)
+linuxmetric_get_all (int interval, std::map<std::string,double> &network_history)
 {
     zlistx_t *info = zlistx_new ();
     zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
@@ -442,7 +456,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_bytes)
     {
         std::string iface = *it;
         if (is_interface_online (iface.c_str ())) {
-            zlistx_t *rx = s_network_usage (iface.c_str (), "rx", interval, network_bytes);
+            zlistx_t *rx = s_network_usage (iface.c_str (), "rx", interval, network_history);
             linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -450,7 +464,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_bytes)
             }
             zlistx_destroy (&rx);
 
-            zlistx_t *tx = s_network_usage (iface.c_str (), "tx", interval, network_bytes);
+            zlistx_t *tx = s_network_usage (iface.c_str (), "tx", interval, network_history);
             network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -458,11 +472,11 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_bytes)
             }
             zlistx_destroy (&tx);
 
-	    linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx");
+	    linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx", network_history);
             if (rx_error != NULL)
                 zlistx_add_end (info, rx_error);
 
-            linuxmetric_t *tx_error = s_network_error_ratio (iface.c_str (), "tx");
+            linuxmetric_t *tx_error = s_network_error_ratio (iface.c_str (), "tx", network_history);
             if (tx_error != NULL)
                 zlistx_add_end (info, tx_error);
         }
