@@ -332,15 +332,12 @@ static zlistx_t *
     bytes_info->unit = "B";
     zlistx_add_end (network_usage_info, bytes_info);
 
-    if (pair_last != network_bytes.end ())
-        network_bytes[skey] = bytes;
-    else
-        network_bytes.insert (std::pair<std::string,double>(skey, bytes));
+    network_bytes[skey] = bytes;
 
     zstr_free (&bytes_type);
     zstr_free (&bandwidth_type);
     zstr_free (&path);
-    //zstr_free (&key);
+    zstr_free (&key);
 
     return network_usage_info;
 }
@@ -401,7 +398,7 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int interval, std::map<std::string,double> network_bytes)
+linuxmetric_get_all (int interval, std::map<std::string,double> &network_bytes)
 {
     zlistx_t *info = zlistx_new ();
     zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
@@ -445,7 +442,6 @@ linuxmetric_get_all (int interval, std::map<std::string,double> network_bytes)
     {
         std::string iface = *it;
         if (is_interface_online (iface.c_str ())) {
-
             zlistx_t *rx = s_network_usage (iface.c_str (), "rx", interval, network_bytes);
             linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
             while (network_usage_metric) {
@@ -454,9 +450,6 @@ linuxmetric_get_all (int interval, std::map<std::string,double> network_bytes)
             }
             zlistx_destroy (&rx);
 
-            for (auto iit = network_bytes.begin (); iit != network_bytes.end (); ++iit) {
-                std::cout << "key: " << iit->first << " value: " << iit->second << std::endl;
-            }
             zlistx_t *tx = s_network_usage (iface.c_str (), "tx", interval, network_bytes);
             network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
             while (network_usage_metric) {
@@ -465,7 +458,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> network_bytes)
             }
             zlistx_destroy (&tx);
 
-            linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx");
+	    linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx");
             if (rx_error != NULL)
                 zlistx_add_end (info, rx_error);
 
