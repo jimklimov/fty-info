@@ -51,6 +51,7 @@ struct _fty_info_server_t {
     bool announce_test;
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
+    std::map<std::string,double> network_bytes;
 };
 
 // Configuration accessors
@@ -79,7 +80,7 @@ s_get (zconfig_t *config, const char* key, const char*dfl) {
 fty_info_server_t  *
 info_server_new (char *name)
 {
-    fty_info_server_t  *self = (fty_info_server_t  *) zmalloc (sizeof (fty_info_server_t ));
+    fty_info_server_t *self = new fty_info_server_t;
     assert (self);
     //  Initialize class properties here
     self->name=strdup(name);
@@ -108,7 +109,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         zstr_free(&self->endpoint);
         topologyresolver_destroy (&self->resolver);
         //  Free object itself
-        free (self);
+        delete self;
         *self_p = NULL;
     }
 }
@@ -213,7 +214,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_interval);
+    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_interval, self->network_bytes);
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
 
