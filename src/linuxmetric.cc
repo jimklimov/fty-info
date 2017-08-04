@@ -135,7 +135,7 @@ s_uptime (void)
     double uptime = s_get_field (line, 1);
 
     linuxmetric_t *uptime_info = linuxmetric_new ();
-    uptime_info->type = "uptime";
+    uptime_info->type = LINUXMETRIC_UPTIME;
     uptime_info->value = uptime;
     uptime_info->unit = "sec";
 
@@ -156,7 +156,7 @@ s_cpu_usage (void)
     double steal = s_get_field (line_cpu, 9);
 
     linuxmetric_t *cpu_usage_info = linuxmetric_new ();
-    cpu_usage_info->type = "usage.cpu";
+    cpu_usage_info->type = LINUXMETRIC_CPU_USAGE;
     cpu_usage_info->value = 100 - 100*((idle + iowait)/(user + nice + system + idle + iowait + irq + softirq + steal));
     cpu_usage_info->unit = "%";
 
@@ -171,7 +171,7 @@ s_cpu_temperature (void)
         double temperature = s_get_field (line, 1);
 
         linuxmetric_t *cpu_temperature_info = linuxmetric_new ();
-        cpu_temperature_info->type = "temperature.cpu";
+        cpu_temperature_info->type = LINUXMETRIC_CPU_TEMPERATURE;
         cpu_temperature_info->value = temperature / 1000;
         cpu_temperature_info->unit = "C";
         return cpu_temperature_info;
@@ -188,7 +188,7 @@ s_meminfo (void)
     double memory_total = s_get_field (line_total, 2);
 
     linuxmetric_t *memory_total_info = linuxmetric_new ();
-    memory_total_info->type = "total.memory";
+    memory_total_info->type = LINUXMETRIC_MEMORY_TOTAL;
     memory_total_info->value = memory_total;
     memory_total_info->unit = "kB";
     zlistx_add_end (meminfo, memory_total_info);
@@ -198,13 +198,13 @@ s_meminfo (void)
     double memory_used = memory_total - memory_free;
 
     linuxmetric_t *memory_used_info = linuxmetric_new ();
-    memory_used_info->type = "used.memory";
+    memory_used_info->type = LINUXMETRIC_MEMORY_USED;
     memory_used_info->value = memory_used;
     memory_used_info->unit = "kB";
     zlistx_add_end (meminfo, memory_used_info);
 
     linuxmetric_t *memory_usage_info = linuxmetric_new ();
-    memory_usage_info->type = "usage.memory";
+    memory_usage_info->type = LINUXMETRIC_MEMORY_USAGE;
     memory_usage_info->value = 100 * (memory_used / memory_total);
     memory_usage_info->unit = "%";
     zlistx_add_end (meminfo, memory_usage_info);
@@ -223,20 +223,20 @@ s_sdcard_info (void)
 
     double sdcard_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *sdcard_total_info = linuxmetric_new ();
-    sdcard_total_info->type = "total.sd-card";
+    sdcard_total_info->type = LINUXMETRIC_SDCARD_TOTAL;
     sdcard_total_info->value = sdcard_total / to_MB;
     sdcard_total_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_total_info);
 
     double sdcard_used = sdcard_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *sdcard_used_info = linuxmetric_new ();
-    sdcard_used_info->type = "used.sd-card";
+    sdcard_used_info->type = LINUXMETRIC_SDCARD_USED;
     sdcard_used_info->value = sdcard_used / to_MB;
     sdcard_used_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_used_info);
 
     linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
-    sdcard_usage_info->type = "usage.sd-card";
+    sdcard_usage_info->type = LINUXMETRIC_SDCARD_USAGE;
     sdcard_usage_info->value = 100 * (sdcard_used / sdcard_total);
     sdcard_usage_info->unit = "%";
     zlistx_add_end (sdcard_info, sdcard_usage_info);
@@ -255,14 +255,14 @@ s_flash_info (void)
 
     double flash_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *flash_total_info = linuxmetric_new ();
-    flash_total_info->type = "total.flash";
+    flash_total_info->type = LINUXMETRIC_FLASH_TOTAL;
     flash_total_info->value = flash_total / to_MB;
     flash_total_info->unit = "MB";
     zlistx_add_end (flash_info, flash_total_info);
 
     double flash_used = flash_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *flash_used_info = linuxmetric_new ();
-    flash_used_info->type = "used.flash";
+    flash_used_info->type = LINUXMETRIC_FLASH_USED;
     flash_used_info->value = flash_used / to_MB;
     flash_used_info->unit = "MB";
     zlistx_add_end (flash_info, flash_used_info);
@@ -270,7 +270,7 @@ s_flash_info (void)
     //df -h computes "/" usage from f_bavail, let's do the same
     double flash_used_nonroot = flash_total - buf.f_bsize * buf.f_bavail;
     linuxmetric_t *flash_usage_info = linuxmetric_new ();
-    flash_usage_info->type = "usage.flash";
+    flash_usage_info->type = LINUXMETRIC_FLASH_USAGE;
     flash_usage_info->value = 100 * (flash_used_nonroot / flash_total);
     flash_usage_info->unit = "%";
     zlistx_add_end (flash_info, flash_usage_info);

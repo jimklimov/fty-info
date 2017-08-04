@@ -26,6 +26,19 @@
 extern "C" {
 #endif
 
+#define LINUXMETRIC_UPTIME "uptime"
+#define LINUXMETRIC_CPU_USAGE "usage.cpu"
+#define LINUXMETRIC_CPU_TEMPERATURE "temperature.cpu"
+#define LINUXMETRIC_MEMORY_TOTAL "total.memory"
+#define LINUXMETRIC_MEMORY_USED "used.memory"
+#define LINUXMETRIC_MEMORY_USAGE "usage.memory"
+#define LINUXMETRIC_SDCARD_TOTAL "total.sd-card"
+#define LINUXMETRIC_SDCARD_USED "used.sd-card"
+#define LINUXMETRIC_SDCARD_USAGE "usage.sd-card"
+#define LINUXMETRIC_FLASH_TOTAL "total.flash"
+#define LINUXMETRIC_FLASH_USED  "used.flash"
+#define LINUXMETRIC_FLASH_USAGE "usage.flash"
+
 struct _linuxmetric_t {
     const char *type;
     double value;
