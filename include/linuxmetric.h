@@ -39,6 +39,10 @@ extern "C" {
 #define LINUXMETRIC_FLASH_USED  "used.flash"
 #define LINUXMETRIC_FLASH_USAGE "usage.flash"
 
+#define BANDWIDTH_TEMPLATE "%s_bandwidth.%s"
+#define BYTES_TEMPLATE "%s_bytes.%s"
+#define ERROR_RATIO_TEMPLATE "%s_error_ratio.%s"
+
 struct _linuxmetric_t {
     char *type;
     double value;
@@ -58,6 +62,8 @@ FTY_INFO_EXPORT void
 FTY_INFO_EXPORT zlistx_t *
     linuxmetric_get_all (int interval, std::map<std::string, double> &network_history);
 
+FTY_INFO_EXPORT zhashx_t *
+    linuxmetric_list_interfaces (void);
 //  @end
 
 #ifdef __cplusplus

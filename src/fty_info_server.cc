@@ -967,6 +967,30 @@ fty_info_server_test (bool verbose)
             const char* type = fty_proto_type (metric);
             zhashx_update (metrics, type, metric);
         }
+
+        zhashx_t *interfaces = linuxmetric_list_interfaces ();
+        const char *state = (const char *) zhashx_first (interfaces);
+        while (state != NULL)  {
+            const char *iface = (const char *) zhashx_cursor (interfaces);
+            zsys_debug ("interface %s = %s", iface, state);
+
+            if (streq (state, "up")) {
+                for (int i = 0; i < 2*3; i++) {
+                    zmsg_t *recv = mlm_client_recv (metric_reader);
+                    assert(recv);
+                    const char *command = mlm_client_command (metric_reader);
+                    assert(streq (command, "STREAM DELIVER"));
+
+                    assert (fty_proto_is (recv));
+                    fty_proto_t *metric = fty_proto_decode (&recv);
+                    assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
+                    const char* type = fty_proto_type (metric);
+                    zhashx_update (metrics, type, metric);
+                }
+            }
+            state = (const char *) zhashx_next (interfaces);
+        }
+
         assert (zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_USAGE));
         assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_TEMPERATURE));
@@ -979,41 +1003,35 @@ fty_info_server_test (bool verbose)
         assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_TOTAL));
         assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USED));
         assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USAGE));
-        /*int ifaces_count = zhashx_size (list_interfaces ());
-        for (int i = 0; i < ifaces_count; i++) {
-            zmsg_t *recv = mlm_client_recv (metric_reader);
-            assert(recv);
-            const char *command = mlm_client_command (metric_reader);
-            assert(streq (command, "STREAM DELIVER"));
 
-            assert (fty_proto_is (recv));
-            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
-            char* type = fty_proto_type (recv);
-            assert (type && streq (type, LINUXMETRIC_BANDWIDTH));
-            zmsg_destroy (&recv);
+        state = (const char *) zhashx_first (interfaces);
+        while (state != NULL)  {
+            const char *iface = (const char *) zhashx_cursor (interfaces);
+            zsys_debug ("interface %s = %s", iface, state);
 
-            zmsg_t *recv = mlm_client_recv (metric_reader);
-            assert(recv);
-            const char *command = mlm_client_command (metric_reader);
-            assert(streq (command, "STREAM DELIVER"));
-
-            assert (fty_proto_is (recv));
-            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
-            char* type = fty_proto_type (recv);
-            assert (type && streq (type, LINUXMETRIC_BYTES));
-            zmsg_destroy (&recv);
-
-            zmsg_t *recv = mlm_client_recv (metric_reader);
-            assert(recv);
-            const char *command = mlm_client_command (metric_reader);
-            assert(streq (command, "STREAM DELIVER"));
-
-            assert (fty_proto_is (recv));
-            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
-            char* type = fty_proto_type (recv);
-            assert (type && streq (type, LINUXMETRIC_ERROR_RATIO));
-            zmsg_destroy (&recv);
-        }*/
+            if (streq (state, "up")) {
+                char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_bandwidth));
+                zstr_free (&rx_bandwidth);
+                char *rx_bytes = zsys_sprintf (BYTES_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_bytes));
+                zstr_free (&rx_bytes);
+                char *rx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_error_ratio));
+                zstr_free (&rx_error_ratio);
+                char *tx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_bandwidth));
+                zstr_free (&tx_bandwidth);
+                char *tx_bytes = zsys_sprintf (BYTES_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_bytes));
+                zstr_free (&tx_bytes);
+                char *tx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_error_ratio));
+                zstr_free (&tx_error_ratio);
+            }
+            state = (const char *) zhashx_next (interfaces);
+        }
+        zhashx_destroy (&interfaces);
         zhashx_destroy (&metrics);
         zsys_info ("fty-info-test:Test #7: OK");
     }

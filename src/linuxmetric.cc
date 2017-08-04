@@ -282,12 +282,6 @@ static bool
 is_interface_online (const char *interface)
 {
     char *interface_dir = zsys_sprintf ("/sys/class/net/%s/", interface);
-
-    // does the interface exist?
-    const std::string dir(interface_dir);
-    if (!cxxtools::Directory::exists (dir))
-        return false;
-
     // is the interface up?
     char *interface_state = zsys_sprintf ("%s/operstate", interface_dir);
     std::string state = s_getline_by_number (interface_state, 1);
@@ -295,6 +289,7 @@ is_interface_online (const char *interface)
     zstr_free (&interface_dir);
     return (state == "up");
 }
+
 
 static zlistx_t *
     s_network_usage
@@ -409,6 +404,26 @@ linuxmetric_destroy (linuxmetric_t **self_p)
     }
 }
 
+zhashx_t *
+linuxmetric_list_interfaces (void)
+{
+    zhashx_t *interfaces = zhashx_new ();
+    cxxtools::Directory dir("/sys/class/net/");
+
+    for (cxxtools::DirectoryIterator it = dir.begin (true); it != dir.end (); ++it) {
+        std::string iface = *it;
+        // we are not interested in loopback
+        if (iface != "lo") {
+            if (is_interface_online (iface.c_str ()))
+                zhashx_update (interfaces, iface.c_str (), (void *) "up");
+            else
+                zhashx_update (interfaces, iface.c_str (), (void *) "down");
+        }
+    }
+
+    return interfaces;
+}
+
 //--------------------------------------------------------------------------
 //// Create zlistx containing all Linux system info
 
@@ -451,13 +466,15 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
     zlistx_destroy (&flash_info);
 
     // loop over all network interfaces
-    cxxtools::Directory dir("/sys/class/net/");
+    zhashx_t *interfaces = linuxmetric_list_interfaces ();
 
-    for (cxxtools::DirectoryIterator it = dir.begin (true); it != dir.end (); ++it)
-    {
-        std::string iface = *it;
-        if (is_interface_online (iface.c_str ())) {
-            zlistx_t *rx = s_network_usage (iface.c_str (), "rx", interval, network_history);
+    const char *state = (const char *) zhashx_first (interfaces);
+    while (state != NULL)  {
+        const char *iface = (const char *) zhashx_cursor (interfaces);
+        zsys_debug ("interface %s = %s", iface, state);
+
+        if (streq (state, "up")) {
+            zlistx_t *rx = s_network_usage (iface, "rx", interval, network_history);
             linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -465,7 +482,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
             }
             zlistx_destroy (&rx);
 
-            zlistx_t *tx = s_network_usage (iface.c_str (), "tx", interval, network_history);
+            zlistx_t *tx = s_network_usage (iface, "tx", interval, network_history);
             network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -473,15 +490,16 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
             }
             zlistx_destroy (&tx);
 
-	    linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx", network_history);
+            linuxmetric_t *rx_error = s_network_error_ratio (iface, "rx", network_history);
             if (rx_error != NULL)
                 zlistx_add_end (info, rx_error);
 
-            linuxmetric_t *tx_error = s_network_error_ratio (iface.c_str (), "tx", network_history);
+            linuxmetric_t *tx_error = s_network_error_ratio (iface, "tx", network_history);
             if (tx_error != NULL)
                 zlistx_add_end (info, tx_error);
         }
+        state = (const char *) zhashx_next (interfaces);
     }
-
+    zhashx_destroy (&interfaces);
     return info;
 }
