@@ -40,7 +40,7 @@ extern "C" {
 #define LINUXMETRIC_FLASH_USAGE "usage.flash"
 
 struct _linuxmetric_t {
-    const char *type;
+    char *type;
     double value;
     const char *unit;
 };

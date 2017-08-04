@@ -220,7 +220,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
 
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
-        const char *value = zsys_sprintf ("%lf", metric->value);
+        char *value = zsys_sprintf ("%lf", metric->value);
         zsys_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
         zmsg_t *msg = fty_proto_encode_metric (
                 NULL,
@@ -231,7 +231,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
                 value,
                 metric->unit
                 );
-        const char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
+        char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
         if (mlm_client_send (self->info_client, subject, &msg) != -1) {
             zsys_info ("Metric %s published on METRICS stream", metric->type);
         }
@@ -239,6 +239,8 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
             zsys_error ("Can't publish metric %s on METRICS stream", metric->type);
         }
         metric = (linuxmetric_t *) zlistx_next (info);
+        zstr_free (&subject);
+        zstr_free (&value);
     }
 
     zlistx_destroy (&info);
@@ -319,7 +321,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 //do the first announce
                 s_publish_announce(self);
         }
-        else if (streq (stream, FTY_PROTO_STREAM_METRICS)) {
+        else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
                     zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
@@ -939,10 +941,83 @@ fty_info_server_test (bool verbose)
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
         zsys_info ("fty-info-test:Test #6: OK");
-
     }
-    //TODO: test that we construct topology properly
-    //TODO: test that UPDATE message updates the topology properly
+    mlm_client_t *metric_reader = mlm_client_new ();
+    mlm_client_connect (metric_reader, endpoint, 1000, "fty_info_metric_reader");
+    mlm_client_set_consumer (metric_reader, "METRICS-TEST", ".*");
+    // TEST #7 : test metrics - just types
+    {
+        zsys_debug ("fty-info-test:Test #7");
+        zstr_sendx (info_server, "PRODUCER", "METRICS-TEST", NULL);
+        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "0", NULL);
+        zclock_sleep (1000);
+
+        zhashx_t *metrics = zhashx_new ();
+        zhashx_set_destructor (metrics, (void (*)(void**)) fty_proto_destroy);
+        for (int i = 0; i < 12; i++)
+        {
+            zmsg_t *recv = mlm_client_recv (metric_reader);
+            assert(recv);
+            const char *command = mlm_client_command (metric_reader);
+            assert(streq (command, "STREAM DELIVER"));
+
+            assert (fty_proto_is (recv));
+            fty_proto_t *metric = fty_proto_decode (&recv);
+            assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
+            const char* type = fty_proto_type (metric);
+            zhashx_update (metrics, type, metric);
+        }
+        assert (zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_USAGE));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_TEMPERATURE));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_TOTAL));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USED));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USAGE));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_TOTAL));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USED));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USAGE));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_TOTAL));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USED));
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USAGE));
+        /*int ifaces_count = zhashx_size (list_interfaces ());
+        for (int i = 0; i < ifaces_count; i++) {
+            zmsg_t *recv = mlm_client_recv (metric_reader);
+            assert(recv);
+            const char *command = mlm_client_command (metric_reader);
+            assert(streq (command, "STREAM DELIVER"));
+
+            assert (fty_proto_is (recv));
+            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
+            char* type = fty_proto_type (recv);
+            assert (type && streq (type, LINUXMETRIC_BANDWIDTH));
+            zmsg_destroy (&recv);
+
+            zmsg_t *recv = mlm_client_recv (metric_reader);
+            assert(recv);
+            const char *command = mlm_client_command (metric_reader);
+            assert(streq (command, "STREAM DELIVER"));
+
+            assert (fty_proto_is (recv));
+            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
+            char* type = fty_proto_type (recv);
+            assert (type && streq (type, LINUXMETRIC_BYTES));
+            zmsg_destroy (&recv);
+
+            zmsg_t *recv = mlm_client_recv (metric_reader);
+            assert(recv);
+            const char *command = mlm_client_command (metric_reader);
+            assert(streq (command, "STREAM DELIVER"));
+
+            assert (fty_proto_is (recv));
+            assert (fty_proto_id (recv) == FTY_PROTO_METRICS);
+            char* type = fty_proto_type (recv);
+            assert (type && streq (type, LINUXMETRIC_ERROR_RATIO));
+            zmsg_destroy (&recv);
+        }*/
+        zhashx_destroy (&metrics);
+        zsys_info ("fty-info-test:Test #7: OK");
+    }
+    mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
     //  @end
     zactor_destroy (&info_server);
