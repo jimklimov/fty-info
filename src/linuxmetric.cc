@@ -449,7 +449,8 @@ zlistx_t *
 linuxmetric_get_all
     (int interval,
      std::map<std::string,double> &network_history,
-     std::string root_dir)
+     std::string root_dir,
+     bool metrics_test)
 {
     zlistx_t *info = zlistx_new ();
 
@@ -469,21 +470,60 @@ linuxmetric_get_all
     }
     zlistx_destroy (&meminfo);
 
-    zlistx_t *sdcard_info = s_sdcard_info (root_dir);
-    linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
-    while (sdcard_metric) {
-        zlistx_add_end (info, sdcard_metric);
-        sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
-    }
-    zlistx_destroy (&sdcard_info);
+    if (!metrics_test) {
+        zlistx_t *sdcard_info = s_sdcard_info (root_dir);
+        linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
+        while (sdcard_metric) {
+            zlistx_add_end (info, sdcard_metric);
+            sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
+        }
+        zlistx_destroy (&sdcard_info);
 
-    zlistx_t *flash_info = s_flash_info (root_dir);
-    linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
-    while (flash_metric) {
-        zlistx_add_end (info, flash_metric);
-        flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+        zlistx_t *flash_info = s_flash_info (root_dir);
+        linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
+        while (flash_metric) {
+            zlistx_add_end (info, flash_metric);
+            flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+        }
+        zlistx_destroy (&flash_info);
     }
-    zlistx_destroy (&flash_info);
+    else {
+        linuxmetric_t *sdcard_total_info = linuxmetric_new ();
+        sdcard_total_info->type = strdup (LINUXMETRIC_SDCARD_TOTAL);
+        sdcard_total_info->value = 10;
+        sdcard_total_info->unit = "MB";
+        zlistx_add_end (info, sdcard_total_info);
+
+        linuxmetric_t *sdcard_used_info = linuxmetric_new ();
+        sdcard_used_info->type = strdup (LINUXMETRIC_SDCARD_USED);
+        sdcard_used_info->value = 1;
+        sdcard_used_info->unit = "MB";
+        zlistx_add_end (info, sdcard_used_info);
+
+        linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
+        sdcard_usage_info->type = strdup (LINUXMETRIC_SDCARD_USAGE);
+        sdcard_usage_info->value = 100 * (sdcard_used_info->value / sdcard_total_info->value);
+        sdcard_usage_info->unit = "%";
+        zlistx_add_end (info, sdcard_usage_info);
+
+        linuxmetric_t *flash_total_info = linuxmetric_new ();
+        flash_total_info->type = strdup (LINUXMETRIC_FLASH_TOTAL);
+        flash_total_info->value = 10;
+        flash_total_info->unit = "MB";
+        zlistx_add_end (info, flash_total_info);
+
+        linuxmetric_t *flash_used_info = linuxmetric_new ();
+        flash_used_info->type = strdup (LINUXMETRIC_FLASH_USED);
+        flash_used_info->value = 5;
+        flash_used_info->unit = "MB";
+        zlistx_add_end (info, flash_used_info);
+
+        linuxmetric_t *flash_usage_info = linuxmetric_new ();
+        flash_usage_info->type = strdup (LINUXMETRIC_FLASH_USAGE);
+        flash_usage_info->value = 100 * (flash_used_info->value / flash_total_info->value);
+        flash_usage_info->unit = "%";
+        zlistx_add_end (info, flash_usage_info);
+    }
 
     // loop over all network interfaces
     zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);

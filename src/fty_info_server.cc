@@ -49,6 +49,7 @@ struct _fty_info_server_t {
     bool verbose;
     bool first_announce;
     bool announce_test;
+    bool metrics_test;
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
     std::string root_dir; //directory to be considered / - used for testing
@@ -91,6 +92,7 @@ info_server_new (char *name)
     self->verbose=false;
     self->first_announce=true;
     self->announce_test=false;
+    self->metrics_test=false;
     return self;
 }
 //  --------------------------------------------------------------------------
@@ -215,7 +217,11 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_interval, self->network_history, self->root_dir);
+    zlistx_t *info = linuxmetric_get_all
+        (self->linuxmetrics_interval,
+         self->network_history,
+         self->root_dir,
+         self->metrics_test);
 
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
@@ -325,6 +331,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 s_publish_announce(self);
         }
         else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
+            self->metrics_test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
                     zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
