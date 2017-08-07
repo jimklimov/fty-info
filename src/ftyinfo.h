@@ -64,6 +64,7 @@ extern "C" {
 //values within history
 #define HIST_CPU_NUMERATOR	"cpu_usage_numerator"
 #define HIST_CPU_DENOMINATOR	"cpu_usage_denominator"
+#define NETWORK_HISTORY_PREFIX	"network_history"
 
 //  @interface
 //  Create a new ftyinfo
