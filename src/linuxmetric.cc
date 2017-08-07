@@ -72,11 +72,11 @@ s_get_field (std::string line, int index)
 
 // Get line number n (counted from 1)
 static std::string
-s_getline_by_number (const char *filename, int index)
+s_getline_by_number (std::string filename, int index)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename);
+        zsys_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -93,18 +93,18 @@ s_getline_by_number (const char *filename, int index)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename);
+        zsys_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
 
 // Get line starting with <name>
 static std::string
-s_getline_by_name (const char *filename, const char *name)
+s_getline_by_name (std::string filename, const char *name)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename);
+        zsys_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -117,7 +117,7 @@ s_getline_by_name (const char *filename, const char *name)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename);
+        zsys_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
@@ -129,9 +129,9 @@ s_getline_by_name (const char *filename, const char *name)
 ////////////////////////////////////////////////////////////
 
 static linuxmetric_t *
-s_uptime (void)
+s_uptime (std::string root_dir)
 {
-    std::string line = s_getline_by_number ("/proc/uptime", 1);
+    std::string line = s_getline_by_number (root_dir + "proc/uptime", 1);
     double uptime = s_get_field (line, 1);
 
     linuxmetric_t *uptime_info = linuxmetric_new ();
@@ -143,9 +143,9 @@ s_uptime (void)
 }
 
 static linuxmetric_t *
-s_cpu_usage (void)
+s_cpu_usage (std::string root_dir)
 {
-    std::string line_cpu = s_getline_by_name ("/proc/stat", "cpu");
+    std::string line_cpu = s_getline_by_name (root_dir + "proc/stat", "cpu");
     double user = s_get_field (line_cpu, 2);
     double nice = s_get_field (line_cpu, 3);
     double system = s_get_field (line_cpu, 4);
@@ -164,9 +164,9 @@ s_cpu_usage (void)
 }
 
 static linuxmetric_t *
-s_cpu_temperature (void)
+s_cpu_temperature (std::string root_dir)
 {
-    std::string line = s_getline_by_number ("/sys/class/thermal/thermal_zone0/temp", 1);
+    std::string line = s_getline_by_number (root_dir + "sys/class/thermal/thermal_zone0/temp", 1);
     if (!line.empty ()) {
         double temperature = s_get_field (line, 1);
 
@@ -180,11 +180,11 @@ s_cpu_temperature (void)
 }
 
 static zlistx_t *
-s_meminfo (void)
+s_meminfo (std::string root_dir)
 {
     zlistx_t *meminfo = zlistx_new ();
 
-    std::string line_total = s_getline_by_name ("/proc/meminfo", "MemTotal:");
+    std::string line_total = s_getline_by_name (root_dir + "proc/meminfo", "MemTotal:");
     double memory_total = s_get_field (line_total, 2);
 
     linuxmetric_t *memory_total_info = linuxmetric_new ();
@@ -193,7 +193,7 @@ s_meminfo (void)
     memory_total_info->unit = "kB";
     zlistx_add_end (meminfo, memory_total_info);
 
-    std::string line_free = s_getline_by_name ("/proc/meminfo", "MemFree:");
+    std::string line_free = s_getline_by_name (root_dir + "proc/meminfo", "MemFree:");
     double memory_free = s_get_field (line_free, 2);
     double memory_used = memory_total - memory_free;
 
@@ -213,12 +213,13 @@ s_meminfo (void)
 }
 
 static zlistx_t *
-s_sdcard_info (void)
+s_sdcard_info (std::string root_dir)
 {
     zlistx_t *sdcard_info = zlistx_new ();
 
     struct statvfs buf;
-    statvfs ("/var", &buf);
+    std::string path (root_dir + "var/");
+    statvfs (path.c_str (), &buf);
     int to_MB = 1024 * 1024;
 
     double sdcard_total = buf.f_blocks * buf.f_frsize;
@@ -245,12 +246,12 @@ s_sdcard_info (void)
 }
 
 static zlistx_t *
-s_flash_info (void)
+s_flash_info (std::string root_dir)
 {
     zlistx_t *flash_info = zlistx_new ();
 
     struct statvfs buf;
-    statvfs ("/", &buf);
+    statvfs (root_dir.c_str (), &buf);
     int to_MB = 1024 * 1024;
 
     double flash_total = buf.f_blocks * buf.f_frsize;
@@ -279,9 +280,10 @@ s_flash_info (void)
 }
 
 static bool
-is_interface_online (const char *interface)
+is_interface_online (const char *interface, std::string root_dir)
 {
-    char *interface_dir = zsys_sprintf ("/sys/class/net/%s/", interface);
+    std::string format (root_dir + "sys/class/net/%s");
+    char *interface_dir = zsys_sprintf (format.c_str (), interface);
     // is the interface up?
     char *interface_state = zsys_sprintf ("%s/operstate", interface_dir);
     std::string state = s_getline_by_number (interface_state, 1);
@@ -296,7 +298,8 @@ static zlistx_t *
     (const char *interface,
      const char *direction,
      int interval,
-     std::map<std::string,double> &network_history)
+     std::map<std::string,double> &network_history,
+     std::string root_dir)
 {
     char *key = zsys_sprintf ("%s_%s", direction, interface);
     std::string skey(key);
@@ -309,19 +312,20 @@ static zlistx_t *
 
     zlistx_t *network_usage_info = zlistx_new ();
 
-    char *path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_bytes", interface, direction);
+    std::string format (root_dir + "sys/class/net/%s/statistics/%s_bytes");
+    char *path = zsys_sprintf (format.c_str (), interface, direction);
     std::string line = s_getline_by_number (path, 1);
     double bytes = s_get_field (line, 1);
 
     linuxmetric_t *bandwidth_info = linuxmetric_new ();
-    char *bandwidth_type = zsys_sprintf ("%s_bandwidth.%s", direction, interface);
+    char *bandwidth_type = zsys_sprintf (BANDWIDTH_TEMPLATE, direction, interface);
     bandwidth_info->type = strdup (bandwidth_type);
     bandwidth_info->value = (bytes - value_last) / interval;
     bandwidth_info->unit = "Bps";
     zlistx_add_end (network_usage_info, bandwidth_info);
 
     linuxmetric_t *bytes_info = linuxmetric_new ();
-    char *bytes_type = zsys_sprintf ("%s_bytes.%s", direction, interface);
+    char *bytes_type = zsys_sprintf (BYTES_TEMPLATE, direction, interface);
     bytes_info->type = strdup (bytes_type);
     bytes_info->value = bytes;
     bytes_info->unit = "B";
@@ -341,7 +345,8 @@ static linuxmetric_t *
     s_network_error_ratio
     (const char *interface,
      const char *direction,
-     std::map<std::string,double> &network_history)
+     std::map<std::string,double> &network_history,
+     std::string root_dir)
 {
     char *key_errors = zsys_sprintf ("%s_%s_errors", direction, interface);
     std::string skey_errors(key_errors);
@@ -361,16 +366,18 @@ static linuxmetric_t *
         zsys_debug ("%s:key_packets found, value %lf", key_packets, value_last_packets);
     }
 
-    char *errors_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_errors", interface, direction);
+    std::string format_errors (root_dir + "sys/class/net/%s/statistics/%s_errors");
+    char *errors_path = zsys_sprintf (format_errors.c_str (), interface, direction);
     std::string errors_line = s_getline_by_number (errors_path, 1);
     double errors = s_get_field (errors_line, 1);
 
-    char *packets_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_packets", interface, direction);
+    std::string format_packets (root_dir + "sys/class/net/%s/statistics/%s_packets");
+    char *packets_path = zsys_sprintf (format_packets.c_str (), interface, direction);
     std::string packets_line = s_getline_by_number (packets_path, 1);
     double packets = s_get_field (packets_line, 1);
 
     linuxmetric_t *error_info = linuxmetric_new ();
-    char *error_type = zsys_sprintf ("%s_error_ratio.%s", direction, interface);
+    char *error_type = zsys_sprintf (ERROR_RATIO_TEMPLATE, direction, interface);
     error_info->type = strdup (error_type);
     error_info->value = 100 * (errors - value_last_errors) / (packets - value_last_packets);
     error_info->unit = "%";
@@ -416,16 +423,16 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 }
 
 zhashx_t *
-linuxmetric_list_interfaces (void)
+linuxmetric_list_interfaces (std::string root_dir)
 {
     zhashx_t *interfaces = zhashx_new ();
-    cxxtools::Directory dir("/sys/class/net/");
+    cxxtools::Directory dir(root_dir + "sys/class/net/");
 
     for (cxxtools::DirectoryIterator it = dir.begin (true); it != dir.end (); ++it) {
         std::string iface = *it;
         // we are not interested in loopback
         if (iface != "lo") {
-            if (is_interface_online (iface.c_str ()))
+            if (is_interface_online (iface.c_str (), root_dir))
                 zhashx_update (interfaces, iface.c_str (), (void *) "up");
             else
                 zhashx_update (interfaces, iface.c_str (), (void *) "down");
@@ -439,20 +446,22 @@ linuxmetric_list_interfaces (void)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int interval, std::map<std::string,double> &network_history)
+linuxmetric_get_all
+    (int interval,
+     std::map<std::string,double> &network_history,
+     std::string root_dir)
 {
     zlistx_t *info = zlistx_new ();
-    zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
 
-    linuxmetric_t *uptime = s_uptime ();
+    linuxmetric_t *uptime = s_uptime (root_dir);
     zlistx_add_end (info, uptime);
-    linuxmetric_t *cpu_usage = s_cpu_usage ();
+    linuxmetric_t *cpu_usage = s_cpu_usage (root_dir);
     zlistx_add_end (info, cpu_usage);
-    linuxmetric_t *cpu_temperature = s_cpu_temperature ();
+    linuxmetric_t *cpu_temperature = s_cpu_temperature (root_dir);
     if (cpu_temperature != NULL)
         zlistx_add_end (info, cpu_temperature);
 
-    zlistx_t *meminfo = s_meminfo ();
+    zlistx_t *meminfo = s_meminfo (root_dir);
     linuxmetric_t *mem_metric = (linuxmetric_t *) zlistx_first (meminfo);
     while (mem_metric) {
         zlistx_add_end (info, mem_metric);
@@ -460,7 +469,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
     }
     zlistx_destroy (&meminfo);
 
-    zlistx_t *sdcard_info = s_sdcard_info ();
+    zlistx_t *sdcard_info = s_sdcard_info (root_dir);
     linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
     while (sdcard_metric) {
         zlistx_add_end (info, sdcard_metric);
@@ -468,7 +477,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
     }
     zlistx_destroy (&sdcard_info);
 
-    zlistx_t *flash_info = s_flash_info ();
+    zlistx_t *flash_info = s_flash_info (root_dir);
     linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
     while (flash_metric) {
         zlistx_add_end (info, flash_metric);
@@ -477,7 +486,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
     zlistx_destroy (&flash_info);
 
     // loop over all network interfaces
-    zhashx_t *interfaces = linuxmetric_list_interfaces ();
+    zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
 
     const char *state = (const char *) zhashx_first (interfaces);
     while (state != NULL)  {
@@ -485,7 +494,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
         zsys_debug ("interface %s = %s", iface, state);
 
         if (streq (state, "up")) {
-            zlistx_t *rx = s_network_usage (iface, "rx", interval, network_history);
+            zlistx_t *rx = s_network_usage (iface, "rx", interval, network_history, root_dir);
             linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -493,7 +502,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
             }
             zlistx_destroy (&rx);
 
-            zlistx_t *tx = s_network_usage (iface, "tx", interval, network_history);
+            zlistx_t *tx = s_network_usage (iface, "tx", interval, network_history, root_dir);
             network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -501,12 +510,11 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
             }
             zlistx_destroy (&tx);
 
-            linuxmetric_t *rx_error = s_network_error_ratio (iface, "rx", network_history);
+            linuxmetric_t *rx_error = s_network_error_ratio (iface, "rx", network_history, root_dir);
             if (rx_error != NULL)
                 zlistx_add_end (info, rx_error);
 
-            linuxmetric_t *tx_error = s_network_error_ratio (iface, "tx", network_history);
-
+            linuxmetric_t *tx_error = s_network_error_ratio (iface, "tx", network_history, root_dir);
             if (tx_error != NULL)
                 zlistx_add_end (info, tx_error);
         }

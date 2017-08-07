@@ -60,10 +60,10 @@ FTY_INFO_EXPORT void
 
 // Create zlistx containing all Linux system info
 FTY_INFO_EXPORT zlistx_t *
-    linuxmetric_get_all (int interval, std::map<std::string, double> &network_history);
+    linuxmetric_get_all (int interval, std::map<std::string, double> &network_history, std::string root_dir);
 
 FTY_INFO_EXPORT zhashx_t *
-    linuxmetric_list_interfaces (void);
+    linuxmetric_list_interfaces (std::string root_dir);
 //  @end
 
 #ifdef __cplusplus
