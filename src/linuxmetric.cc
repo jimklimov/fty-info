@@ -143,7 +143,7 @@ s_uptime (void)
 }
 
 static linuxmetric_t *
-s_cpu_usage (void)
+s_cpu_usage (zhashx_t *history)
 {
     std::string line_cpu = s_getline_by_name ("/proc/stat", "cpu");
     double user = s_get_field (line_cpu, 2);
@@ -154,11 +154,30 @@ s_cpu_usage (void)
     double irq = s_get_field (line_cpu, 7);
     double softirq = s_get_field (line_cpu, 8);
     double steal = s_get_field (line_cpu, 9);
+    double *numerator_ptr = (double *)zmalloc(sizeof(double));
+    double *denominator_ptr = (double *)zmalloc(sizeof(double));
+    *numerator_ptr = idle + iowait;
+    *denominator_ptr = user + nice + system + idle + iowait + irq + softirq + steal;
+    double *history_numerator_ptr = (double *) zhashx_lookup(history, HIST_CPU_NUMERATOR);
+    double *history_denominator_ptr = (double *) zhashx_lookup(history, HIST_CPU_DENOMINATOR);
+    double history_numerator = 0;
+    double history_denominator = 0;
+    if (NULL != history_numerator_ptr && NULL != history_denominator_ptr) {
+      history_numerator = *history_numerator_ptr;
+      history_denominator = *history_denominator_ptr;
+    }
 
     linuxmetric_t *cpu_usage_info = linuxmetric_new ();
     cpu_usage_info->type = "usage.cpu";
-    cpu_usage_info->value = 100 - 100*((idle + iowait)/(user + nice + system + idle + iowait + irq + softirq + steal));
+    cpu_usage_info->value = 100 - 100*((*numerator_ptr - history_numerator)/(*denominator_ptr - history_denominator));
     cpu_usage_info->unit = "%";
+    /* update or insert numerator and denominator to history */
+    if (-1 == zhashx_insert(history, HIST_CPU_NUMERATOR, numerator_ptr)) {
+      zhashx_update(history, HIST_CPU_NUMERATOR, numerator_ptr);
+    }
+    if (-1 == zhashx_insert(history, HIST_CPU_DENOMINATOR, denominator_ptr)) {
+      zhashx_update(history, HIST_CPU_DENOMINATOR, denominator_ptr);
+    }
 
     return cpu_usage_info;
 }
@@ -423,14 +442,14 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int interval, std::map<std::string,double> &network_history)
+linuxmetric_get_all (int interval, std::map<std::string,double> &network_history, zhashx_t *history)
 {
     zlistx_t *info = zlistx_new ();
     zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
 
     linuxmetric_t *uptime = s_uptime ();
     zlistx_add_end (info, uptime);
-    linuxmetric_t *cpu_usage = s_cpu_usage ();
+    linuxmetric_t *cpu_usage = s_cpu_usage (history);
     zlistx_add_end (info, cpu_usage);
     linuxmetric_t *cpu_temperature = s_cpu_temperature ();
     if (cpu_temperature != NULL)
