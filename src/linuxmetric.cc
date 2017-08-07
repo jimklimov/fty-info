@@ -343,13 +343,22 @@ static linuxmetric_t *
      const char *direction,
      std::map<std::string,double> &network_history)
 {
-    char *key = zsys_sprintf ("%s_%s_errors", direction, interface);
-    std::string skey(key);
-    auto pair_last = network_history.find (skey);
-    double value_last = 0;
-    if (pair_last != network_history.end ()) {
-        value_last = pair_last->second;
-        zsys_debug ("%s:key found, value %lf", key, value_last);
+    char *key_errors = zsys_sprintf ("%s_%s_errors", direction, interface);
+    std::string skey_errors(key_errors);
+    auto pair_last_errors = network_history.find (skey_errors);
+    double value_last_errors = 0;
+    if (pair_last_errors != network_history.end ()) {
+        value_last_errors = pair_last_errors->second;
+        zsys_debug ("%s:key_errors found, value %lf", key_errors, value_last_errors);
+    }
+
+    char *key_packets = zsys_sprintf ("%s_%s_packets", direction, interface);
+    std::string skey_packets(key_packets);
+    auto pair_last_packets = network_history.find (skey_packets);
+    double value_last_packets = 0;
+    if (pair_last_packets != network_history.end ()) {
+        value_last_packets = pair_last_packets->second;
+        zsys_debug ("%s:key_packets found, value %lf", key_packets, value_last_packets);
     }
 
     char *errors_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_errors", interface, direction);
@@ -363,15 +372,17 @@ static linuxmetric_t *
     linuxmetric_t *error_info = linuxmetric_new ();
     char *error_type = zsys_sprintf ("%s_error_ratio.%s", direction, interface);
     error_info->type = strdup (error_type);
-    error_info->value = 100 * (errors - value_last) / packets;
+    error_info->value = 100 * (errors - value_last_errors) / (packets - value_last_packets);
     error_info->unit = "%";
 
-    network_history[skey] = errors;
+    network_history[skey_errors] = errors;
+    network_history[skey_packets] = packets;
 
     zstr_free (&error_type);
     zstr_free (&packets_path);
     zstr_free (&errors_path);
-    zstr_free (&key);
+    zstr_free (&key_packets);
+    zstr_free (&key_errors);
     return error_info;
 }
 
@@ -495,6 +506,7 @@ linuxmetric_get_all (int interval, std::map<std::string,double> &network_history
                 zlistx_add_end (info, rx_error);
 
             linuxmetric_t *tx_error = s_network_error_ratio (iface, "tx", network_history);
+
             if (tx_error != NULL)
                 zlistx_add_end (info, tx_error);
         }
