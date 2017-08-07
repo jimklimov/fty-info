@@ -53,7 +53,7 @@ struct _fty_info_server_t {
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
     std::string root_dir; //directory to be considered / - used for testing
-    std::map<std::string,double> network_history;
+    zhashx_t *history;
 };
 
 // Configuration accessors
@@ -77,11 +77,19 @@ s_get (zconfig_t *config, const char* key, const char*dfl) {
 }
 
 //  --------------------------------------------------------------------------
+//  Free wrapper for zhashx destructor
+static void history_destructor(void **item) {
+    free(*item);
+}
+
+//  --------------------------------------------------------------------------
 //  Create a new fty_info_server
 
 fty_info_server_t  *
 info_server_new (char *name)
 {
+    double *numerator_ptr = (double *)zmalloc(sizeof(double));
+    double *denominator_ptr = (double *)zmalloc(sizeof(double));
     fty_info_server_t *self = new fty_info_server_t;
     assert (self);
     //  Initialize class properties here
@@ -93,6 +101,10 @@ info_server_new (char *name)
     self->first_announce=true;
     self->announce_test=false;
     self->metrics_test=false;
+    self->history = zhashx_new();
+    zhashx_set_destructor(self->history, history_destructor);
+    zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
+    zhashx_insert(self->history, HIST_CPU_DENOMINATOR, denominator_ptr);
     return self;
 }
 //  --------------------------------------------------------------------------
@@ -111,6 +123,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         zstr_free(&self->name);
         zstr_free(&self->endpoint);
         topologyresolver_destroy (&self->resolver);
+        zhashx_destroy(&self->history);
         //  Free object itself
         delete self;
         *self_p = NULL;
@@ -219,7 +232,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
 
     zlistx_t *info = linuxmetric_get_all
         (self->linuxmetrics_interval,
-         self->network_history,
+         self->history,
          self->root_dir,
          self->metrics_test);
 

@@ -62,7 +62,7 @@ FTY_INFO_EXPORT void
 FTY_INFO_EXPORT zlistx_t *
     linuxmetric_get_all
     (int interval,
-     std::map<std::string, double> &network_history,
+     zhashx_t *history,
      std::string root_dir,
      bool metrics_test);
 

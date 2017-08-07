@@ -61,6 +61,11 @@ extern "C" {
 #define TST_PATH        "/api/v1"
 #define TST_PORT        "80"
 
+//values within history
+#define HIST_CPU_NUMERATOR	"cpu_usage_numerator"
+#define HIST_CPU_DENOMINATOR	"cpu_usage_denominator"
+#define NETWORK_HISTORY_PREFIX	"network_history"
+
 //  @interface
 //  Create a new ftyinfo
 FTY_INFO_PRIVATE ftyinfo_t *
