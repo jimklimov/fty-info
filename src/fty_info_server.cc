@@ -49,8 +49,10 @@ struct _fty_info_server_t {
     bool verbose;
     bool first_announce;
     bool announce_test;
+    bool metrics_test;
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
+    std::string root_dir; //directory to be considered / - used for testing
     zhashx_t *history;
 };
 
@@ -98,6 +100,7 @@ info_server_new (char *name)
     self->verbose=false;
     self->first_announce=true;
     self->announce_test=false;
+    self->metrics_test=false;
     self->history = zhashx_new();
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
@@ -227,13 +230,18 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     if(!mlm_client_connected(self->info_client))
         return;
 
-    zlistx_t *info = linuxmetric_get_all (self->linuxmetrics_interval, self->history);
+    zlistx_t *info = linuxmetric_get_all
+        (self->linuxmetrics_interval,
+         self->history,
+         self->root_dir,
+         self->metrics_test);
+
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
     const char *rc_iname = topologyresolver_id (self->resolver);
 
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
-        const char *value = zsys_sprintf ("%lf", metric->value);
+        char *value = zsys_sprintf ("%lf", metric->value);
         zsys_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
         zmsg_t *msg = fty_proto_encode_metric (
                 NULL,
@@ -244,14 +252,17 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
                 value,
                 metric->unit
                 );
-        const char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
+        char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
         if (mlm_client_send (self->info_client, subject, &msg) != -1) {
             zsys_info ("Metric %s published on METRICS stream", metric->type);
         }
         else {
             zsys_error ("Can't publish metric %s on METRICS stream", metric->type);
         }
+        linuxmetric_destroy (&metric);
         metric = (linuxmetric_t *) zlistx_next (info);
+        zstr_free (&subject);
+        zstr_free (&value);
     }
 
     zlistx_destroy (&info);
@@ -332,7 +343,8 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 //do the first announce
                 s_publish_announce(self);
         }
-        else if (streq (stream, FTY_PROTO_STREAM_METRICS)) {
+        else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
+            self->metrics_test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
                     zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
@@ -357,6 +369,12 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         zsys_info ("Will be publishing metrics each %s seconds", interval);
         self->linuxmetrics_interval = (int) strtol (interval, NULL, 10);
         zstr_free (&interval);
+    }
+    else if (streq (command, "ROOT_DIR")) {
+        char *root_dir = zmsg_popstr (message);
+        zsys_info ("Will be using %s as root dir for finding out Linux metrics", root_dir);
+        self->root_dir.assign (root_dir);
+        zstr_free (&root_dir);
     }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
@@ -952,10 +970,181 @@ fty_info_server_test (bool verbose)
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
         zsys_info ("fty-info-test:Test #6: OK");
-
     }
-    //TODO: test that we construct topology properly
-    //TODO: test that UPDATE message updates the topology properly
+    mlm_client_t *metric_reader = mlm_client_new ();
+    mlm_client_connect (metric_reader, endpoint, 1000, "fty_info_metric_reader");
+    mlm_client_set_consumer (metric_reader, "METRICS-TEST", ".*");
+    // TEST #7 : test metrics - just types
+    {
+        zsys_debug ("fty-info-test:Test #7");
+
+        // Note: If your selftest reads SCMed fixture data, please keep it in
+        // src/selftest-ro; if your test creates filesystem objects, please
+        // do so under src/selftest-rw. They are defined below along with a
+        // usecase for the variables (assert) to make compilers happy.
+        const char *SELFTEST_DIR_RO = "src/selftest-ro";
+        const char *SELFTEST_DIR_RW = "src/selftest-rw";
+        assert (SELFTEST_DIR_RO);
+        assert (SELFTEST_DIR_RW);
+        // Uncomment these to use C++ strings in C++ selftest code:
+        std::string str_SELFTEST_DIR_RO = std::string(SELFTEST_DIR_RO);
+        std::string str_SELFTEST_DIR_RW = std::string(SELFTEST_DIR_RW);
+        assert ( (str_SELFTEST_DIR_RO != "") );
+        assert ( (str_SELFTEST_DIR_RW != "") );
+        // NOTE that for "char*" context you need (str_SELFTEST_DIR_RO + "/myfilename").c_str()
+
+        std::string root_dir = str_SELFTEST_DIR_RO + "/data/";
+        zstr_sendx (info_server, "ROOT_DIR", root_dir.c_str (), NULL);
+        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "0", NULL);
+        zstr_sendx (info_server, "PRODUCER", "METRICS-TEST", NULL);
+        zclock_sleep (1000);
+
+        zhashx_t *metrics = zhashx_new ();
+        zhashx_set_destructor (metrics, (void (*)(void**)) fty_proto_destroy);
+        // we have 12 non-network metrics
+        for (int i = 0; i < 12; i++)
+        {
+            zmsg_t *recv = mlm_client_recv (metric_reader);
+            assert(recv);
+            const char *command = mlm_client_command (metric_reader);
+            assert(streq (command, "STREAM DELIVER"));
+
+            assert (fty_proto_is (recv));
+            fty_proto_t *metric = fty_proto_decode (&recv);
+            assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
+            const char* type = fty_proto_type (metric);
+            zhashx_update (metrics, type, metric);
+        }
+
+        zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
+        const char *state = (const char *) zhashx_first (interfaces);
+        while (state != NULL)  {
+            const char *iface = (const char *) zhashx_cursor (interfaces);
+            zsys_debug ("interface %s = %s", iface, state);
+
+            if (streq (state, "up")) {
+                // we have 3 network metrics: bandwidth, bytes, error_ratio
+                // for both rx and tx
+                for (int i = 0; i < 2*3; i++) {
+                    zmsg_t *recv = mlm_client_recv (metric_reader);
+                    assert(recv);
+                    const char *command = mlm_client_command (metric_reader);
+                    assert(streq (command, "STREAM DELIVER"));
+
+                    assert (fty_proto_is (recv));
+                    fty_proto_t *metric = fty_proto_decode (&recv);
+                    assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
+                    const char* type = fty_proto_type (metric);
+                    zhashx_update (metrics, type, metric);
+                }
+            }
+            state = (const char *) zhashx_next (interfaces);
+        }
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
+        fty_proto_t *metric = (fty_proto_t *) zhashx_lookup (metrics, LINUXMETRIC_UPTIME);
+        assert (1000000 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_USAGE);
+        assert (50 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_CPU_TEMPERATURE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_CPU_TEMPERATURE);
+        assert (50 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_TOTAL);
+        assert (4096 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USED);
+        assert (2048 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE);
+        assert (50 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_TOTAL);
+        assert (10 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USED);
+        assert (1 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USAGE);
+        assert (10 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_TOTAL);
+        assert (10 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USED);
+        assert (5 == atoi (fty_proto_value (metric)));
+
+        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USAGE);
+        assert (50 == atoi (fty_proto_value (metric)));
+
+        state = (const char *) zhashx_first (interfaces);
+        while (state != NULL)  {
+            const char *iface = (const char *) zhashx_cursor (interfaces);
+            zsys_debug ("interface %s = %s", iface, state);
+
+            if (streq (state, "up")) {
+                char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_bandwidth));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bandwidth);
+                assert (0 == atoi (fty_proto_value (metric)));
+                zstr_free (&rx_bandwidth);
+
+                char *rx_bytes = zsys_sprintf (BYTES_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_bytes));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bytes);
+                assert (1000000 == atoi (fty_proto_value (metric)));
+                zstr_free (&rx_bytes);
+
+                char *rx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "rx", iface);
+                assert (zhashx_lookup (metrics, rx_error_ratio));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, rx_error_ratio);
+                if (streq (iface, "LAN1"))
+                    assert (1 == atoi (fty_proto_value (metric)));
+                else
+                    assert (0 == atoi (fty_proto_value (metric)));
+                zstr_free (&rx_error_ratio);
+
+                char *tx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_bandwidth));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bandwidth);
+                assert (0 == atoi (fty_proto_value (metric)));
+                zstr_free (&tx_bandwidth);
+
+                char *tx_bytes = zsys_sprintf (BYTES_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_bytes));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bytes);
+                assert (1000000 == atoi (fty_proto_value (metric)));
+                zstr_free (&tx_bytes);
+
+                char *tx_error_ratio = zsys_sprintf (ERROR_RATIO_TEMPLATE, "tx", iface);
+                assert (zhashx_lookup (metrics, tx_error_ratio));
+                metric = (fty_proto_t *) zhashx_lookup (metrics, tx_error_ratio);
+                if (streq (iface, "LAN1"))
+                    assert (50 == atoi (fty_proto_value (metric)));
+                else
+                    assert (0 == atoi (fty_proto_value (metric)));
+                zstr_free (&tx_error_ratio);
+            }
+            state = (const char *) zhashx_next (interfaces);
+        }
+
+        zhashx_destroy (&interfaces);
+        zhashx_destroy (&metrics);
+        zsys_info ("fty-info-test:Test #7: OK");
+    }
+    mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
     //  @end
     zactor_destroy (&info_server);

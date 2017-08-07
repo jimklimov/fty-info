@@ -26,8 +26,25 @@
 extern "C" {
 #endif
 
+#define LINUXMETRIC_UPTIME "uptime"
+#define LINUXMETRIC_CPU_USAGE "usage.cpu"
+#define LINUXMETRIC_CPU_TEMPERATURE "temperature.cpu"
+#define LINUXMETRIC_MEMORY_TOTAL "total.memory"
+#define LINUXMETRIC_MEMORY_USED "used.memory"
+#define LINUXMETRIC_MEMORY_USAGE "usage.memory"
+#define LINUXMETRIC_SDCARD_TOTAL "total.sd-card"
+#define LINUXMETRIC_SDCARD_USED "used.sd-card"
+#define LINUXMETRIC_SDCARD_USAGE "usage.sd-card"
+#define LINUXMETRIC_FLASH_TOTAL "total.flash"
+#define LINUXMETRIC_FLASH_USED  "used.flash"
+#define LINUXMETRIC_FLASH_USAGE "usage.flash"
+
+#define BANDWIDTH_TEMPLATE "%s_bandwidth.%s"
+#define BYTES_TEMPLATE "%s_bytes.%s"
+#define ERROR_RATIO_TEMPLATE "%s_error_ratio.%s"
+
 struct _linuxmetric_t {
-    const char *type;
+    char *type;
     double value;
     const char *unit;
 };
@@ -43,8 +60,14 @@ FTY_INFO_EXPORT void
 
 // Create zlistx containing all Linux system info
 FTY_INFO_EXPORT zlistx_t *
-    linuxmetric_get_all (int interval, zhashx_t *history);
+    linuxmetric_get_all
+    (int interval,
+     zhashx_t *history,
+     std::string root_dir,
+     bool metrics_test);
 
+FTY_INFO_EXPORT zhashx_t *
+    linuxmetric_list_interfaces (std::string root_dir);
 //  @end
 
 #ifdef __cplusplus

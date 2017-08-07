@@ -72,11 +72,11 @@ s_get_field (std::string line, int index)
 
 // Get line number n (counted from 1)
 static std::string
-s_getline_by_number (const char *filename, int index)
+s_getline_by_number (std::string filename, int index)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename);
+        zsys_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -93,18 +93,18 @@ s_getline_by_number (const char *filename, int index)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename);
+        zsys_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
 
 // Get line starting with <name>
 static std::string
-s_getline_by_name (const char *filename, const char *name)
+s_getline_by_name (std::string filename, const char *name)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename);
+        zsys_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -117,7 +117,7 @@ s_getline_by_name (const char *filename, const char *name)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename);
+        zsys_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
@@ -129,13 +129,13 @@ s_getline_by_name (const char *filename, const char *name)
 ////////////////////////////////////////////////////////////
 
 static linuxmetric_t *
-s_uptime (void)
+s_uptime (std::string root_dir)
 {
-    std::string line = s_getline_by_number ("/proc/uptime", 1);
+    std::string line = s_getline_by_number (root_dir + "proc/uptime", 1);
     double uptime = s_get_field (line, 1);
 
     linuxmetric_t *uptime_info = linuxmetric_new ();
-    uptime_info->type = "uptime";
+    uptime_info->type = strdup (LINUXMETRIC_UPTIME);
     uptime_info->value = uptime;
     uptime_info->unit = "sec";
 
@@ -143,9 +143,9 @@ s_uptime (void)
 }
 
 static linuxmetric_t *
-s_cpu_usage (zhashx_t *history)
+s_cpu_usage (std::string root_dir, zhashx_t *history)
 {
-    std::string line_cpu = s_getline_by_name ("/proc/stat", "cpu");
+    std::string line_cpu = s_getline_by_name (root_dir + "proc/stat", "cpu");
     double user = s_get_field (line_cpu, 2);
     double nice = s_get_field (line_cpu, 3);
     double system = s_get_field (line_cpu, 4);
@@ -166,7 +166,7 @@ s_cpu_usage (zhashx_t *history)
     }
 
     linuxmetric_t *cpu_usage_info = linuxmetric_new ();
-    cpu_usage_info->type = "usage.cpu";
+    cpu_usage_info->type = strdup (LINUXMETRIC_CPU_USAGE);
     cpu_usage_info->value = 100 - 100*((numerator - history_numerator)/(denominator - history_denominator));
     cpu_usage_info->unit = "%";
     /* update or insert numerator and denominator to history */
@@ -177,14 +177,14 @@ s_cpu_usage (zhashx_t *history)
 }
 
 static linuxmetric_t *
-s_cpu_temperature (void)
+s_cpu_temperature (std::string root_dir)
 {
-    std::string line = s_getline_by_number ("/sys/class/thermal/thermal_zone0/temp", 1);
+    std::string line = s_getline_by_number (root_dir + "sys/class/thermal/thermal_zone0/temp", 1);
     if (!line.empty ()) {
         double temperature = s_get_field (line, 1);
 
         linuxmetric_t *cpu_temperature_info = linuxmetric_new ();
-        cpu_temperature_info->type = "temperature.cpu";
+        cpu_temperature_info->type = strdup (LINUXMETRIC_CPU_TEMPERATURE);
         cpu_temperature_info->value = temperature / 1000;
         cpu_temperature_info->unit = "C";
         return cpu_temperature_info;
@@ -193,31 +193,31 @@ s_cpu_temperature (void)
 }
 
 static zlistx_t *
-s_meminfo (void)
+s_meminfo (std::string root_dir)
 {
     zlistx_t *meminfo = zlistx_new ();
 
-    std::string line_total = s_getline_by_name ("/proc/meminfo", "MemTotal:");
+    std::string line_total = s_getline_by_name (root_dir + "proc/meminfo", "MemTotal:");
     double memory_total = s_get_field (line_total, 2);
 
     linuxmetric_t *memory_total_info = linuxmetric_new ();
-    memory_total_info->type = "total.memory";
+    memory_total_info->type = strdup (LINUXMETRIC_MEMORY_TOTAL);
     memory_total_info->value = memory_total;
     memory_total_info->unit = "kB";
     zlistx_add_end (meminfo, memory_total_info);
 
-    std::string line_free = s_getline_by_name ("/proc/meminfo", "MemFree:");
+    std::string line_free = s_getline_by_name (root_dir + "proc/meminfo", "MemFree:");
     double memory_free = s_get_field (line_free, 2);
     double memory_used = memory_total - memory_free;
 
     linuxmetric_t *memory_used_info = linuxmetric_new ();
-    memory_used_info->type = "used.memory";
+    memory_used_info->type = strdup (LINUXMETRIC_MEMORY_USED);
     memory_used_info->value = memory_used;
     memory_used_info->unit = "kB";
     zlistx_add_end (meminfo, memory_used_info);
 
     linuxmetric_t *memory_usage_info = linuxmetric_new ();
-    memory_usage_info->type = "usage.memory";
+    memory_usage_info->type = strdup (LINUXMETRIC_MEMORY_USAGE);
     memory_usage_info->value = 100 * (memory_used / memory_total);
     memory_usage_info->unit = "%";
     zlistx_add_end (meminfo, memory_usage_info);
@@ -226,30 +226,31 @@ s_meminfo (void)
 }
 
 static zlistx_t *
-s_sdcard_info (void)
+s_sdcard_info (std::string root_dir)
 {
     zlistx_t *sdcard_info = zlistx_new ();
 
     struct statvfs buf;
-    statvfs ("/var", &buf);
+    std::string path (root_dir + "var/");
+    statvfs (path.c_str (), &buf);
     int to_MB = 1024 * 1024;
 
     double sdcard_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *sdcard_total_info = linuxmetric_new ();
-    sdcard_total_info->type = "total.sd-card";
+    sdcard_total_info->type = strdup (LINUXMETRIC_SDCARD_TOTAL);
     sdcard_total_info->value = sdcard_total / to_MB;
     sdcard_total_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_total_info);
 
     double sdcard_used = sdcard_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *sdcard_used_info = linuxmetric_new ();
-    sdcard_used_info->type = "used.sd-card";
+    sdcard_used_info->type = strdup (LINUXMETRIC_SDCARD_USED);
     sdcard_used_info->value = sdcard_used / to_MB;
     sdcard_used_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_used_info);
 
     linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
-    sdcard_usage_info->type = "usage.sd-card";
+    sdcard_usage_info->type = strdup (LINUXMETRIC_SDCARD_USAGE);
     sdcard_usage_info->value = 100 * (sdcard_used / sdcard_total);
     sdcard_usage_info->unit = "%";
     zlistx_add_end (sdcard_info, sdcard_usage_info);
@@ -258,24 +259,24 @@ s_sdcard_info (void)
 }
 
 static zlistx_t *
-s_flash_info (void)
+s_flash_info (std::string root_dir)
 {
     zlistx_t *flash_info = zlistx_new ();
 
     struct statvfs buf;
-    statvfs ("/", &buf);
+    statvfs (root_dir.c_str (), &buf);
     int to_MB = 1024 * 1024;
 
     double flash_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *flash_total_info = linuxmetric_new ();
-    flash_total_info->type = "total.flash";
+    flash_total_info->type = strdup (LINUXMETRIC_FLASH_TOTAL);
     flash_total_info->value = flash_total / to_MB;
     flash_total_info->unit = "MB";
     zlistx_add_end (flash_info, flash_total_info);
 
     double flash_used = flash_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *flash_used_info = linuxmetric_new ();
-    flash_used_info->type = "used.flash";
+    flash_used_info->type = strdup (LINUXMETRIC_FLASH_USED);
     flash_used_info->value = flash_used / to_MB;
     flash_used_info->unit = "MB";
     zlistx_add_end (flash_info, flash_used_info);
@@ -283,7 +284,7 @@ s_flash_info (void)
     //df -h computes "/" usage from f_bavail, let's do the same
     double flash_used_nonroot = flash_total - buf.f_bsize * buf.f_bavail;
     linuxmetric_t *flash_usage_info = linuxmetric_new ();
-    flash_usage_info->type = "usage.flash";
+    flash_usage_info->type = strdup (LINUXMETRIC_FLASH_USAGE);
     flash_usage_info->value = 100 * (flash_used_nonroot / flash_total);
     flash_usage_info->unit = "%";
     zlistx_add_end (flash_info, flash_usage_info);
@@ -292,15 +293,10 @@ s_flash_info (void)
 }
 
 static bool
-is_interface_online (const char *interface)
+is_interface_online (const char *interface, std::string root_dir)
 {
-    char *interface_dir = zsys_sprintf ("/sys/class/net/%s/", interface);
-
-    // does the interface exist?
-    const std::string dir(interface_dir);
-    if (!cxxtools::Directory::exists (dir))
-        return false;
-
+    std::string format (root_dir + "sys/class/net/%s");
+    char *interface_dir = zsys_sprintf (format.c_str (), interface);
     // is the interface up?
     char *interface_state = zsys_sprintf ("%s/operstate", interface_dir);
     std::string state = s_getline_by_number (interface_state, 1);
@@ -309,12 +305,14 @@ is_interface_online (const char *interface)
     return (state == "up");
 }
 
+
 static zlistx_t *
     s_network_usage
     (const char *interface,
      const char *direction,
      int interval,
-     zhashx_t *history)
+     zhashx_t *history,
+     std::string root_dir)
 {
     char *last_key = zsys_sprintf ("%s_%s_%s", NETWORK_HISTORY_PREFIX, direction, interface);
     double *value_last_ptr = (double *) zhashx_lookup(history, last_key);
@@ -326,19 +324,20 @@ static zlistx_t *
 
     zlistx_t *network_usage_info = zlistx_new ();
 
-    char *path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_bytes", interface, direction);
+    std::string format (root_dir + "sys/class/net/%s/statistics/%s_bytes");
+    char *path = zsys_sprintf (format.c_str (), interface, direction);
     std::string line = s_getline_by_number (path, 1);
     double bytes = s_get_field (line, 1);
 
     linuxmetric_t *bandwidth_info = linuxmetric_new ();
-    char *bandwidth_type = zsys_sprintf ("%s_bandwidth.%s", direction, interface);
+    char *bandwidth_type = zsys_sprintf (BANDWIDTH_TEMPLATE, direction, interface);
     bandwidth_info->type = strdup (bandwidth_type);
     bandwidth_info->value = (bytes - value_last) / interval;
     bandwidth_info->unit = "Bps";
     zlistx_add_end (network_usage_info, bandwidth_info);
 
     linuxmetric_t *bytes_info = linuxmetric_new ();
-    char *bytes_type = zsys_sprintf ("%s_bytes.%s", direction, interface);
+    char *bytes_type = zsys_sprintf (BYTES_TEMPLATE, direction, interface);
     bytes_info->type = strdup (bytes_type);
     bytes_info->value = bytes;
     bytes_info->unit = "B";
@@ -365,7 +364,8 @@ static linuxmetric_t *
     s_network_error_ratio
     (const char *interface,
      const char *direction,
-     zhashx_t *history)
+     zhashx_t *history,
+     std::string root_dir)
 {
     char *last_errors_key = zsys_sprintf ("%s_%s_%s_errors", NETWORK_HISTORY_PREFIX, direction, interface);
     double *value_last_errors_ptr = (double *) zhashx_lookup(history, last_errors_key);
@@ -382,17 +382,19 @@ static linuxmetric_t *
         value_last_packets = *value_last_packets_ptr;
         zsys_debug ("%s:key found, value %lf", last_packets_key, value_last_packets);
     }
-    
-    char *errors_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_errors", interface, direction);
+
+    std::string format_errors (root_dir + "sys/class/net/%s/statistics/%s_errors");
+    char *errors_path = zsys_sprintf (format_errors.c_str (), interface, direction);
     std::string errors_line = s_getline_by_number (errors_path, 1);
     double errors = s_get_field (errors_line, 1);
 
-    char *packets_path = zsys_sprintf ("/sys/class/net/%s/statistics/%s_packets", interface, direction);
+    std::string format_packets (root_dir + "sys/class/net/%s/statistics/%s_packets");
+    char *packets_path = zsys_sprintf (format_packets.c_str (), interface, direction);
     std::string packets_line = s_getline_by_number (packets_path, 1);
     double packets = s_get_field (packets_line, 1);
 
     linuxmetric_t *error_info = linuxmetric_new ();
-    char *error_type = zsys_sprintf ("%s_error_ratio.%s", direction, interface);
+    char *error_type = zsys_sprintf (ERROR_RATIO_TEMPLATE, direction, interface);
     error_info->type = strdup (error_type);
     error_info->value = 100 * (errors - value_last_errors) / (packets - value_last_packets);
     error_info->unit = "%";
@@ -444,30 +446,54 @@ linuxmetric_destroy (linuxmetric_t **self_p)
     if (*self_p) {
         linuxmetric_t *self = *self_p;
         //  Free class properties here
+        zstr_free (&self->type);
         //  Free object itself
         free (self);
         *self_p = NULL;
     }
 }
 
+zhashx_t *
+linuxmetric_list_interfaces (std::string root_dir)
+{
+    zhashx_t *interfaces = zhashx_new ();
+    cxxtools::Directory dir(root_dir + "sys/class/net/");
+
+    for (cxxtools::DirectoryIterator it = dir.begin (true); it != dir.end (); ++it) {
+        std::string iface = *it;
+        // we are not interested in loopback
+        if (iface != "lo") {
+            if (is_interface_online (iface.c_str (), root_dir))
+                zhashx_update (interfaces, iface.c_str (), (void *) "up");
+            else
+                zhashx_update (interfaces, iface.c_str (), (void *) "down");
+        }
+    }
+
+    return interfaces;
+}
+
 //--------------------------------------------------------------------------
 //// Create zlistx containing all Linux system info
 
 zlistx_t *
-linuxmetric_get_all (int interval, zhashx_t *history)
+linuxmetric_get_all
+    (int interval,
+     zhashx_t *history,
+     std::string root_dir,
+     bool metrics_test)
 {
     zlistx_t *info = zlistx_new ();
-    zlistx_set_destructor (info, (void (*)(void**)) linuxmetric_destroy);
 
-    linuxmetric_t *uptime = s_uptime ();
+    linuxmetric_t *uptime = s_uptime (root_dir);
     zlistx_add_end (info, uptime);
-    linuxmetric_t *cpu_usage = s_cpu_usage (history);
+    linuxmetric_t *cpu_usage = s_cpu_usage (root_dir, history);
     zlistx_add_end (info, cpu_usage);
-    linuxmetric_t *cpu_temperature = s_cpu_temperature ();
+    linuxmetric_t *cpu_temperature = s_cpu_temperature (root_dir);
     if (cpu_temperature != NULL)
         zlistx_add_end (info, cpu_temperature);
 
-    zlistx_t *meminfo = s_meminfo ();
+    zlistx_t *meminfo = s_meminfo (root_dir);
     linuxmetric_t *mem_metric = (linuxmetric_t *) zlistx_first (meminfo);
     while (mem_metric) {
         zlistx_add_end (info, mem_metric);
@@ -475,30 +501,71 @@ linuxmetric_get_all (int interval, zhashx_t *history)
     }
     zlistx_destroy (&meminfo);
 
-    zlistx_t *sdcard_info = s_sdcard_info ();
-    linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
-    while (sdcard_metric) {
-        zlistx_add_end (info, sdcard_metric);
-        sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
-    }
-    zlistx_destroy (&sdcard_info);
+    if (!metrics_test) {
+        zlistx_t *sdcard_info = s_sdcard_info (root_dir);
+        linuxmetric_t *sdcard_metric = (linuxmetric_t *) zlistx_first (sdcard_info);
+        while (sdcard_metric) {
+            zlistx_add_end (info, sdcard_metric);
+            sdcard_metric = (linuxmetric_t *) zlistx_next (sdcard_info);
+        }
+        zlistx_destroy (&sdcard_info);
 
-    zlistx_t *flash_info = s_flash_info ();
-    linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
-    while (flash_metric) {
-        zlistx_add_end (info, flash_metric);
-        flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+        zlistx_t *flash_info = s_flash_info (root_dir);
+        linuxmetric_t *flash_metric = (linuxmetric_t *) zlistx_first (flash_info);
+        while (flash_metric) {
+            zlistx_add_end (info, flash_metric);
+            flash_metric = (linuxmetric_t *) zlistx_next (flash_info);
+        }
+        zlistx_destroy (&flash_info);
     }
-    zlistx_destroy (&flash_info);
+    else {
+        linuxmetric_t *sdcard_total_info = linuxmetric_new ();
+        sdcard_total_info->type = strdup (LINUXMETRIC_SDCARD_TOTAL);
+        sdcard_total_info->value = 10;
+        sdcard_total_info->unit = "MB";
+        zlistx_add_end (info, sdcard_total_info);
+
+        linuxmetric_t *sdcard_used_info = linuxmetric_new ();
+        sdcard_used_info->type = strdup (LINUXMETRIC_SDCARD_USED);
+        sdcard_used_info->value = 1;
+        sdcard_used_info->unit = "MB";
+        zlistx_add_end (info, sdcard_used_info);
+
+        linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
+        sdcard_usage_info->type = strdup (LINUXMETRIC_SDCARD_USAGE);
+        sdcard_usage_info->value = 100 * (sdcard_used_info->value / sdcard_total_info->value);
+        sdcard_usage_info->unit = "%";
+        zlistx_add_end (info, sdcard_usage_info);
+
+        linuxmetric_t *flash_total_info = linuxmetric_new ();
+        flash_total_info->type = strdup (LINUXMETRIC_FLASH_TOTAL);
+        flash_total_info->value = 10;
+        flash_total_info->unit = "MB";
+        zlistx_add_end (info, flash_total_info);
+
+        linuxmetric_t *flash_used_info = linuxmetric_new ();
+        flash_used_info->type = strdup (LINUXMETRIC_FLASH_USED);
+        flash_used_info->value = 5;
+        flash_used_info->unit = "MB";
+        zlistx_add_end (info, flash_used_info);
+
+        linuxmetric_t *flash_usage_info = linuxmetric_new ();
+        flash_usage_info->type = strdup (LINUXMETRIC_FLASH_USAGE);
+        flash_usage_info->value = 100 * (flash_used_info->value / flash_total_info->value);
+        flash_usage_info->unit = "%";
+        zlistx_add_end (info, flash_usage_info);
+    }
 
     // loop over all network interfaces
-    cxxtools::Directory dir("/sys/class/net/");
+    zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
 
-    for (cxxtools::DirectoryIterator it = dir.begin (true); it != dir.end (); ++it)
-    {
-        std::string iface = *it;
-        if (is_interface_online (iface.c_str ())) {
-            zlistx_t *rx = s_network_usage (iface.c_str (), "rx", interval, history);
+    const char *state = (const char *) zhashx_first (interfaces);
+    while (state != NULL)  {
+        const char *iface = (const char *) zhashx_cursor (interfaces);
+        zsys_debug ("interface %s = %s", iface, state);
+
+        if (streq (state, "up")) {
+            zlistx_t *rx = s_network_usage (iface, "rx", interval, history, root_dir);
             linuxmetric_t *network_usage_metric = (linuxmetric_t *) zlistx_first (rx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -506,7 +573,7 @@ linuxmetric_get_all (int interval, zhashx_t *history)
             }
             zlistx_destroy (&rx);
 
-            zlistx_t *tx = s_network_usage (iface.c_str (), "tx", interval, history);
+            zlistx_t *tx = s_network_usage (iface, "tx", interval, history, root_dir);
             network_usage_metric = (linuxmetric_t *) zlistx_first (tx);
             while (network_usage_metric) {
                 zlistx_add_end (info, network_usage_metric);
@@ -514,15 +581,16 @@ linuxmetric_get_all (int interval, zhashx_t *history)
             }
             zlistx_destroy (&tx);
 
-	    linuxmetric_t *rx_error = s_network_error_ratio (iface.c_str (), "rx", history);
+            linuxmetric_t *rx_error = s_network_error_ratio (iface, "rx", history, root_dir);
             if (rx_error != NULL)
                 zlistx_add_end (info, rx_error);
 
-            linuxmetric_t *tx_error = s_network_error_ratio (iface.c_str (), "tx", history);
+            linuxmetric_t *tx_error = s_network_error_ratio (iface, "tx", history, root_dir);
             if (tx_error != NULL)
                 zlistx_add_end (info, tx_error);
         }
+        state = (const char *) zhashx_next (interfaces);
     }
-
+    zhashx_destroy (&interfaces);
     return info;
 }

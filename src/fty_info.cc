@@ -150,8 +150,9 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
-    zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
+    zstr_sendx (server, "ROOT_DIR", "/", NULL);
     zstr_sendx (server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
+    zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
     zloop_t *timer_loop = zloop_new();
     zloop_timer (timer_loop, announcing * 1000, 0, s_announce_event, server);
