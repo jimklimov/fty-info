@@ -478,7 +478,7 @@ topologyresolver_test (bool verbose)
 
     fty_proto_t *msg4 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg4, "me");
-    fty_proto_set_operation (msg2, FTY_PROTO_ASSET_OP_UPDATE);
+    fty_proto_set_operation (msg4, FTY_PROTO_ASSET_OP_UPDATE);
     ext = zhash_new ();
     zhash_autofree (ext);
     zhash_update (ext, "name", (void *)"this is me");
