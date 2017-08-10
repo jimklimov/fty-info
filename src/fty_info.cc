@@ -35,13 +35,6 @@ s_linuxmetrics_event (zloop_t *loop, int timer_id, void *output)
     return 0;
 }
 
-static int
-s_announce_event (zloop_t *loop, int timer_id, void *output)
-{
-    zstr_send (output, "ANNOUNCE");
-    return 0;
-}
-
 void
 usage(){
     puts   ("fty-info [options] ...");
@@ -49,13 +42,11 @@ usage(){
     puts   ("  -h|--help           this information");
     puts   ("  -c|--config         path to config file\n");
     puts   ("  -e|--endpoint       malamute endpoint [ipc://@/malamute]");
-    printf ("  -a|--announce       how often (in seconds) publish information on stream [%d]\n", DEFAULT_ANNOUNCE_INTERVAL_SEC);
 
 }
 
 int main (int argc, char *argv [])
 {
-    int announcing = DEFAULT_ANNOUNCE_INTERVAL_SEC;
     int linuxmetrics_interval = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
     const char *str_linuxmetrics_interval = NULL;
     char *config_file = NULL;
@@ -77,12 +68,6 @@ int main (int argc, char *argv [])
         }
         else if (streq (argv [argn], "--verbose") ||  streq (argv [argn], "-v")) {
             verbose = true;
-        }
-        else if (streq (argv [argn], "--announce") ||  streq (argv [argn], "-a")) {
-            ++argn;
-            if (argn < argc) {
-                announcing = atoi (argv [argn]);
-            }
         }
         else if (streq (argv [argn], "--config") || streq (argv [argn], "-c")) {
             if (param) config_file = param;
@@ -112,12 +97,6 @@ int main (int argc, char *argv [])
         // VERBOSE
         if (streq (zconfig_get (config, "server/verbose", "false"), "true")) {
             verbose = true;
-        }
-
-        // Announcement interval (in seconds)
-        const char *str_announcing = s_get (config, "server/announce", "60");
-        if (str_announcing) {
-            announcing = atoi(str_announcing);
         }
 
 	 // Linux metrics publishing interval (in seconds)
@@ -155,7 +134,6 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
     zloop_t *timer_loop = zloop_new();
-    zloop_timer (timer_loop, announcing * 1000, 0, s_announce_event, server);
     zloop_timer (timer_loop, linuxmetrics_interval * 1000, 0, s_linuxmetrics_event, server);
     zloop_start (timer_loop);
 
