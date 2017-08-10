@@ -44,7 +44,7 @@ FTY_INFO_PRIVATE char *
     topologyresolver_to_rc_name_uri (topologyresolver_t *self);
 
 //  Give topology resolver one asset information
-FTY_INFO_PRIVATE void
+FTY_INFO_PRIVATE bool
     topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message);
 
 //  Return URI of the asset's parent

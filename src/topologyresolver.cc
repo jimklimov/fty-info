@@ -219,13 +219,14 @@ topologyresolver_id (topologyresolver_t *self)
 
 //  --------------------------------------------------------------------------
 //  Give topology resolver one asset information
-void
+bool
 topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
 {
-    if (! self || ! message) return;
-    if (fty_proto_id (message) != FTY_PROTO_ASSET) return;
+    if (! self || ! message) return false;
+    if (fty_proto_id (message) != FTY_PROTO_ASSET) return false;
     const char *operation = fty_proto_operation (message);
-    if (operation && streq (operation, "inventory")) return;
+    //discard inventory due to the lack of some field.
+    if (operation && streq (operation, "inventory")) return false;
 
     if (!self->iname && s_is_this_me (message)) {
         self->iname = strdup (fty_proto_name (message));
@@ -255,6 +256,7 @@ topologyresolver_asset (topologyresolver_t *self, fty_proto_t *message)
             zlistx_destroy (&list);
         }
     }
+    return s_is_this_me (message);
 }
 
 //  --------------------------------------------------------------------------

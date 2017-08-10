@@ -420,7 +420,9 @@ s_handle_stream (fty_info_server_t* self, zmsg_t *message)
         return;
 
     }
-    topologyresolver_asset (self->resolver, bmessage);
+    topologyresolver_asset (self->resolver, bmessage) {
+        s_publish_announce(self);
+    }
 
     fty_proto_destroy (&bmessage);
     zmsg_destroy (&message);
