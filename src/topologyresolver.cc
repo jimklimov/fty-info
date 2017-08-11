@@ -278,7 +278,7 @@ topologyresolver_to_parent_uri (topologyresolver_t *self)
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message) {
-            const char *parent_iname = fty_proto_aux_string (rc_message, "parent", "NA");
+            const char *parent_iname = fty_proto_aux_string (rc_message, "parent_name.1", "NA");
             if (!streq (parent_iname, "NA")) {
                 return zsys_sprintf ("/asset/%s", parent_iname);
             }
