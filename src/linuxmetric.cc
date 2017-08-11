@@ -129,7 +129,7 @@ s_getline_by_name (std::string filename, const char *name)
 ////////////////////////////////////////////////////////////
 
 static linuxmetric_t *
-s_uptime (std::string root_dir)
+s_uptime (std::string &root_dir)
 {
     std::string line = s_getline_by_number (root_dir + "proc/uptime", 1);
     double uptime = s_get_field (line, 1);
@@ -143,7 +143,7 @@ s_uptime (std::string root_dir)
 }
 
 static linuxmetric_t *
-s_cpu_usage (std::string root_dir, zhashx_t *history)
+s_cpu_usage (std::string &root_dir, zhashx_t *history)
 {
     std::string line_cpu = s_getline_by_name (root_dir + "proc/stat", "cpu");
     double user = s_get_field (line_cpu, 2);
@@ -177,7 +177,7 @@ s_cpu_usage (std::string root_dir, zhashx_t *history)
 }
 
 static linuxmetric_t *
-s_cpu_temperature (std::string root_dir)
+s_cpu_temperature (std::string &root_dir)
 {
     std::string line = s_getline_by_number (root_dir + "sys/class/thermal/thermal_zone0/temp", 1);
     if (!line.empty ()) {
@@ -193,7 +193,7 @@ s_cpu_temperature (std::string root_dir)
 }
 
 static zlistx_t *
-s_meminfo (std::string root_dir)
+s_meminfo (std::string &root_dir)
 {
     zlistx_t *meminfo = zlistx_new ();
 
@@ -226,7 +226,7 @@ s_meminfo (std::string root_dir)
 }
 
 static zlistx_t *
-s_sdcard_info (std::string root_dir)
+s_sdcard_info (std::string &root_dir)
 {
     zlistx_t *sdcard_info = zlistx_new ();
 
@@ -259,7 +259,7 @@ s_sdcard_info (std::string root_dir)
 }
 
 static zlistx_t *
-s_flash_info (std::string root_dir)
+s_flash_info (std::string &root_dir)
 {
     zlistx_t *flash_info = zlistx_new ();
 
@@ -293,7 +293,7 @@ s_flash_info (std::string root_dir)
 }
 
 static bool
-is_interface_online (const char *interface, std::string root_dir)
+is_interface_online (const char *interface, std::string &root_dir)
 {
     std::string format (root_dir + "sys/class/net/%s");
     char *interface_dir = zsys_sprintf (format.c_str (), interface);
@@ -312,7 +312,7 @@ static zlistx_t *
      const char *direction,
      int interval,
      zhashx_t *history,
-     std::string root_dir)
+     std::string &root_dir)
 {
     char *last_key = zsys_sprintf ("%s_%s_%s", NETWORK_HISTORY_PREFIX, direction, interface);
     double *value_last_ptr = (double *) zhashx_lookup(history, last_key);
@@ -365,7 +365,7 @@ static linuxmetric_t *
     (const char *interface,
      const char *direction,
      zhashx_t *history,
-     std::string root_dir)
+     std::string &root_dir)
 {
     char *last_errors_key = zsys_sprintf ("%s_%s_%s_errors", NETWORK_HISTORY_PREFIX, direction, interface);
     double *value_last_errors_ptr = (double *) zhashx_lookup(history, last_errors_key);
@@ -454,7 +454,7 @@ linuxmetric_destroy (linuxmetric_t **self_p)
 }
 
 zhashx_t *
-linuxmetric_list_interfaces (std::string root_dir)
+linuxmetric_list_interfaces (std::string &root_dir)
 {
     zhashx_t *interfaces = zhashx_new ();
     cxxtools::Directory dir(root_dir + "sys/class/net/");
@@ -480,7 +480,7 @@ zlistx_t *
 linuxmetric_get_all
     (int interval,
      zhashx_t *history,
-     std::string root_dir,
+     std::string &root_dir,
      bool metrics_test)
 {
     zlistx_t *info = zlistx_new ();

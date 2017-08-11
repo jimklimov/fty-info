@@ -693,7 +693,7 @@ fty_info_server_test (bool verbose)
         zhash_autofree (ext);
         zhash_update (aux, "type", (void *) "device");
 	    zhash_update (aux, "subtype", (void *) "rackcontroller");
-	    zhash_update (aux, "parent", (void *) parent);
+	    zhash_update (aux, "parent_name.1", (void *) parent);
         zhash_update (ext, "name", (void *) name);
         zhash_update (ext, "ip.1", (void *) "127.0.0.1");
 
