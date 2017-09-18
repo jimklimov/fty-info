@@ -104,6 +104,7 @@ s_get_installation_date (
         }
     }
     catch (const std::exception& e) {
+        installation_date = "N/A - Undefined error occured";
         zsys_error ("Exception caught: %s", e.what ());
     }
 }
@@ -134,12 +135,17 @@ s_get_release_details
      const char *key,
      const char * dfl)
 {
-    std::string value = dfl;
+    std::string value;
     try {
         si->getMember("release-details").getMember(key) >>= value;
     }
     catch (const std::exception& e) {
-        zsys_error ("Error while getting %s in JSON: %s", key, e.what ());
+        zsys_info ("Problem with getting %s in JSON: %s", key, e.what ());
+        if (dfl) {
+            return strdup(dfl);
+        } else {
+            return NULL;
+        }
     }
     return strdup(value.c_str());
 }
@@ -167,7 +173,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:hostname  = '%s'", self->hostname);
 
     //set id
-    self->id = strdup (topologyresolver_id (resolver));
+    self->id = topologyresolver_id (resolver);
     zsys_info ("fty-info:id        = '%s'", self->id);
 
     //set name
@@ -179,7 +185,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zsys_info ("fty-info:name_uri  = '%s'", self-> name_uri);
 
     //set location
-    self->location = strdup (topologyresolver_to_string (resolver, ">"));
+    self->location = topologyresolver_to_string (resolver, ">");
     zsys_info ("fty-info:location  = '%s'", self->location);
 
     //set parent_uri
@@ -189,12 +195,12 @@ ftyinfo_new (topologyresolver_t *resolver)
     //set uuid, vendor, model, part_number, verson from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
     si = s_load_release_details();
-    self->uuid   = s_get_release_details (si, "uuid", "00000000-0000-0000-0000-000000000000");
-    self->vendor = s_get_release_details (si, "hardware-vendor", "NA");
-    self->serial = s_get_release_details (si, "hardware-serial-number", "NA");
-    self->model  = s_get_release_details (si, "hardware-catalog-number", "NA");
-    self->part_number  = s_get_release_details (si, "hardware-part-number", "NA");
-    self->version   = s_get_release_details (si, "osimage-name", "NA");
+    self->uuid   = s_get_release_details (si, "uuid", NULL);
+    self->vendor = s_get_release_details (si, "hardware-vendor", NULL);
+    self->serial = s_get_release_details (si, "hardware-serial-number", NULL);
+    self->model  = s_get_release_details (si, "hardware-catalog-number", NULL);
+    self->part_number  = s_get_release_details (si, "hardware-part-number", NULL);
+    self->version   = s_get_release_details (si, "osimage-name", NULL);
     zsys_info ("fty-info:uuid      = '%s'", self->uuid);
     zsys_info ("fty-info:vendor    = '%s'", self->vendor);
     zsys_info ("fty-info:serial    = '%s'", self->serial);
@@ -276,25 +282,25 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         ftyinfo_t *self = *self_ptr;
         // Free class properties here
         zhash_destroy(&self->infos);
-        zstr_free (&self->id);
-        zstr_free (&self->uuid);
-        zstr_free (&self->hostname);
-        zstr_free (&self->name);
-        zstr_free (&self->name_uri);
-        zstr_free (&self->model);
-        zstr_free (&self->vendor);
-        zstr_free (&self->serial);
-        zstr_free (&self->part_number);
-        zstr_free (&self->location);
-        zstr_free (&self->parent_uri);
-        zstr_free (&self->version);
-        zstr_free (&self->description);
-        zstr_free (&self->contact);
-        zstr_free (&self->installDate);
-        zstr_free (&self->path);
-        zstr_free (&self->protocol_format);
-        zstr_free (&self->type);
-        zstr_free (&self->txtvers);
+        if (&self->id) zstr_free (&self->id);
+        if (&self->uuid) zstr_free (&self->uuid);
+        if (&self->hostname) zstr_free (&self->hostname);
+        if (&self->name)  zstr_free (&self->name);
+        if (&self->name_uri) zstr_free (&self->name_uri);
+        if (&self->model) zstr_free (&self->model);
+        if (&self->vendor) zstr_free (&self->vendor);
+        if (&self->serial) zstr_free (&self->serial);
+        if (&self->part_number) zstr_free (&self->part_number);
+        if (&self->location) zstr_free (&self->location);
+        if (&self->parent_uri) zstr_free (&self->parent_uri);
+        if (&self->version) zstr_free (&self->version);
+        if (&self->description) zstr_free (&self->description);
+        if (&self->contact) zstr_free (&self->contact);
+        if (&self->installDate) zstr_free (&self->installDate);
+        if (&self->path) zstr_free (&self->path);
+        if (&self->protocol_format) zstr_free (&self->protocol_format);
+        if (&self->type) zstr_free (&self->type);
+        if (&self->txtvers) zstr_free (&self->txtvers);
         // Free object itself
         free (self);
         *self_ptr = NULL;
@@ -316,25 +322,25 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     zhash_destroy (&self->infos);
     self->infos = zhash_new ();
 
-    zhash_insert (self->infos, INFO_ID, self->id);
-    zhash_insert(self->infos, INFO_UUID, self->uuid);
-    zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
-    zhash_insert(self->infos, INFO_NAME, self->name);
-    zhash_insert(self->infos, INFO_NAME_URI, self->name_uri);
-    zhash_insert(self->infos, INFO_VENDOR, self->vendor);
-    zhash_insert(self->infos, INFO_MODEL, self->model);
-    zhash_insert(self->infos, INFO_SERIAL, self->serial);
-    zhash_insert(self->infos, INFO_PART_NUMBER, self->part_number);
-    zhash_insert(self->infos, INFO_LOCATION, self->location);
-    zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
-    zhash_insert(self->infos, INFO_VERSION, self->version);
-    zhash_insert(self->infos, INFO_DESCRIPTION, self->description);
-    zhash_insert(self->infos, INFO_CONTACT, self->contact);
-    zhash_insert(self->infos, INFO_INSTALL_DATE, self->installDate);
-    zhash_insert(self->infos, INFO_REST_PATH, self->path);
-    zhash_insert(self->infos, INFO_PROTOCOL_FORMAT, self->protocol_format);
-    zhash_insert(self->infos, INFO_TYPE, self->type);
-    zhash_insert(self->infos, INFO_TXTVERS, self->txtvers);
+    if (self->id) zhash_insert (self->infos, INFO_ID, self->id);
+    if (self->uuid) zhash_insert(self->infos, INFO_UUID, self->uuid);
+    if (self->hostname) zhash_insert(self->infos, INFO_HOSTNAME, self->hostname);
+    if (self->name) zhash_insert(self->infos, INFO_NAME, self->name);
+    if (self->name_uri) zhash_insert(self->infos, INFO_NAME_URI, self->name_uri);
+    if (self->vendor) zhash_insert(self->infos, INFO_VENDOR, self->vendor);
+    if (self->model) zhash_insert(self->infos, INFO_MODEL, self->model);
+    if (self->serial) zhash_insert(self->infos, INFO_SERIAL, self->serial);
+    if (self->part_number) zhash_insert(self->infos, INFO_PART_NUMBER, self->part_number);
+    if (self->location) zhash_insert(self->infos, INFO_LOCATION, self->location);
+    if (self->parent_uri) zhash_insert(self->infos, INFO_PARENT_URI, self->parent_uri);
+    if (self->version) zhash_insert(self->infos, INFO_VERSION, self->version);
+    if (self->description) zhash_insert(self->infos, INFO_DESCRIPTION, self->description);
+    if (self->contact) zhash_insert(self->infos, INFO_CONTACT, self->contact);
+    if (self->installDate) zhash_insert(self->infos, INFO_INSTALL_DATE, self->installDate);
+    if (self->path) zhash_insert(self->infos, INFO_REST_PATH, self->path);
+    if (self->protocol_format) zhash_insert(self->infos, INFO_PROTOCOL_FORMAT, self->protocol_format);
+    if (self->type) zhash_insert(self->infos, INFO_TYPE, self->type);
+    if (self->txtvers) zhash_insert(self->infos, INFO_TXTVERS, self->txtvers);
 
     return self->infos;
 }

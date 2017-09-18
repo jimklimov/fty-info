@@ -210,11 +210,11 @@ topologyresolver_destroy (topologyresolver_t **self_p)
 //  --------------------------------------------------------------------------
 //  get RC internal name
 
-const char *
+char *
 topologyresolver_id (topologyresolver_t *self)
 {
-    if (! self || ! self->iname) return "NA";
-    return  self->iname;
+    if (! self || ! self->iname) return NULL;
+    return strdup(self->iname);
 }
 
 //  --------------------------------------------------------------------------
@@ -267,7 +267,7 @@ char *
     if (self && self->iname)
         return zsys_sprintf ("/asset/%s", self->iname);
     else
-        return strdup ("NA");
+        return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -278,18 +278,13 @@ topologyresolver_to_parent_uri (topologyresolver_t *self)
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
         if (rc_message) {
-            const char *parent_iname = fty_proto_aux_string (rc_message, "parent_name.1", "NA");
-            if (!streq (parent_iname, "NA")) {
+            const char *parent_iname = fty_proto_aux_string (rc_message, "parent_name.1", NULL);
+            if (parent_iname) {
                 return zsys_sprintf ("/asset/%s", parent_iname);
             }
-            else
-                return strdup ("NA");
         }
-        else
-            return strdup ("NA");
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 
@@ -300,13 +295,14 @@ topologyresolver_to_rc_name (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "name", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *name = fty_proto_ext_string (rc_message, "name", NULL);
+            if (name) {
+                return strdup(name);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -316,13 +312,14 @@ topologyresolver_to_description (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "description", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *description = fty_proto_ext_string (rc_message, "description", NULL);
+            if (description) {
+                return strdup(description);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
@@ -332,25 +329,26 @@ topologyresolver_to_contact (topologyresolver_t *self)
 {
     if (self && self->iname) {
         fty_proto_t *rc_message = (fty_proto_t *) zhashx_lookup (self->assets, self->iname);
-        if (rc_message)
-            return strdup (fty_proto_ext_string (rc_message, "contact_email", "NA"));
-        else
-            return strdup ("NA");
+        if (rc_message) {
+            const char *contact_email = fty_proto_ext_string (rc_message, "contact_email", NULL);
+            if (contact_email) {
+                strdup(contact_email);
+            }
+        }
     }
-    else
-        return strdup ("NA");
+    return NULL;
 }
 
 //  --------------------------------------------------------------------------
 //  Return topology as string of friendly names (or NULL if incomplete)
-const char *
+char *
 topologyresolver_to_string (topologyresolver_t *self, const char *separator)
 {
     zlistx_t *parents = topologyresolver_to_list (self);
 
     if (! zlistx_size (parents)) {
         zlistx_destroy (&parents);
-        return "NA";
+        return NULL;
     }
 
     zstr_free (&self->topology);
@@ -374,7 +372,7 @@ topologyresolver_to_string (topologyresolver_t *self, const char *separator)
         *p = 0;
     }
     zlistx_destroy (&parents);
-    return self->topology;
+    return strdup(self->topology);
 }
 
 
@@ -459,9 +457,9 @@ topologyresolver_test (bool verbose)
     zhash_update (aux, "parent_name.1", (void *)"grandparent");
     fty_proto_set_aux (msg3, &aux);
 
-    const char *res = topologyresolver_to_string (resolver);
+    char *res = topologyresolver_to_string (resolver);
     topologyresolver_asset (resolver, msg1);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     topologyresolver_asset (resolver, msg);
     assert (zhashx_size (resolver->assets) == 2);
@@ -469,12 +467,13 @@ topologyresolver_test (bool verbose)
     topologyresolver_asset (resolver, msg2);
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     topologyresolver_asset (resolver, msg3);
     assert (zhashx_size (resolver->assets) == 3);
     res = topologyresolver_to_string (resolver, "->");
     assert (streq ("my nice grandparent->this is father", res));
+    free(res);
 
     fty_proto_t *msg4 = fty_proto_new (FTY_PROTO_ASSET);
     fty_proto_set_name (msg4, "me");
@@ -491,7 +490,7 @@ topologyresolver_test (bool verbose)
 
     topologyresolver_asset (resolver, msg4);
     res = topologyresolver_to_string (resolver);
-    assert (streq (res, "NA"));
+    assert (NULL == res);
 
     fty_proto_t *msg5 = fty_proto_new (FTY_PROTO_ASSET);
 
@@ -509,7 +508,7 @@ topologyresolver_test (bool verbose)
     topologyresolver_asset (resolver, msg5);
     res = topologyresolver_to_string (resolver, "->");
     assert (streq ("my nice grandparent->this is new father", res));
-
+    free(res);
 
     fty_proto_destroy (&msg5);
     fty_proto_destroy (&msg4);
