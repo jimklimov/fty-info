@@ -40,7 +40,9 @@ using namespace std;
 #define DEFAULT_LINUXMETRICS_INTERVAL_SEC   30
 
 // TODO: get from config
-// #define TIMEOUT_MS -1   //wait infinitely
+#define TIMEOUT_MS -1   //wait infinitely
+#define DEFAULT_UUID        "00000000-0000-0000-0000-000000000000"  //in case of UUID being NULL
+#define DEFAULT_RC_INAME    "rackcontroller-0"
 
 #define INFO_ID        "id"
 #define INFO_UUID      "uuid"
