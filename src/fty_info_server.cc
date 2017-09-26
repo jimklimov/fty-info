@@ -26,6 +26,7 @@
 @end
 */
 #define TIMEOUT_MS -1   //wait infinitelly
+#define DEFAULT_UUID    "00000000-0000-0000-0000-000000000000"  //in case of UUID being NULL
 
 #include <string>
 #include <unistd.h>
@@ -139,7 +140,11 @@ char *s_get_name(const char *name, const char *uuid)
 
     char *buffer = (char*)malloc(strlen(name)+12);
     char first_digit[9];
-    strncpy ( first_digit, uuid, 8 );
+    if (uuid) {
+        strncpy ( first_digit, uuid, 8 );
+    } else {
+        strncpy ( first_digit, DEFAULT_UUID, 8 );
+    }
     first_digit[8]='\0';
     sprintf(buffer, "%s (%s)",name,first_digit);
     return buffer;
@@ -159,7 +164,7 @@ char *s_get_name(const char *name, const char *uuid)
 //          name_uri
 //          vendor
 //          serial
-//          model
+//          product
 //          location
 //          parent_uri
 //          version
@@ -174,7 +179,11 @@ s_create_info (ftyinfo_t *info)
     zmsg_t *msg=zmsg_new();
     zmsg_addstr (msg, FTY_INFO_CMD);
     char *srv_name = s_get_name(SRV_NAME, ftyinfo_uuid(info));
-    zmsg_addstr (msg, srv_name);
+    if (srv_name) {
+        zmsg_addstr (msg, srv_name);
+    } else {
+        zmsg_addstr (msg, DEFAULT_UUID);
+    }
     zmsg_addstr (msg, SRV_TYPE);
     zmsg_addstr (msg, SRV_STYPE);
     zmsg_addstr (msg, SRV_PORT);
@@ -237,7 +246,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
          self->metrics_test);
 
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
-    const char *rc_iname = topologyresolver_id (self->resolver);
+    char *rc_iname = topologyresolver_id (self->resolver);
 
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
@@ -265,6 +274,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
         zstr_free (&value);
     }
 
+    free(rc_iname);
     zlistx_destroy (&info);
 
 }
@@ -608,9 +618,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
@@ -807,12 +817,12 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-            /*if (streq (key, INFO_NAME))
-                assert (streq (value, TST_NAME));
-            if (streq (key, INFO_NAME_URI))
-                assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION_URI))
-                assert (streq (value, TST_LOCATION2_URI));*/
+            // if (streq (key, INFO_NAME))
+            //     assert (streq (value, TST_NAME));
+            // if (streq (key, INFO_NAME_URI))
+            //     assert (streq (value, TST_NAME_URI));
+            // if (streq (key, INFO_LOCATION_URI))
+            //     assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -880,12 +890,12 @@ fty_info_server_test (bool verbose)
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
             zsys_debug ("fty-info-test: %s = %s",key,value);
-            /*if (streq (key, INFO_NAME))
-                assert (streq (value, TST_NAME));
-            if (streq (key, INFO_NAME_URI))
-                assert (streq (value, TST_NAME_URI));
-            if (streq (key, INFO_LOCATION_URI))
-                assert (streq (value, TST_LOCATION2_URI));*/
+            // if (streq (key, INFO_NAME))
+            //     assert (streq (value, TST_NAME));
+            // if (streq (key, INFO_NAME_URI))
+            //     assert (streq (value, TST_NAME_URI));
+            // if (streq (key, INFO_LOCATION_URI))
+            //     assert (streq (value, TST_LOCATION2_URI));
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -946,9 +956,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
