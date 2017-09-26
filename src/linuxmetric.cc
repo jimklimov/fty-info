@@ -122,6 +122,11 @@ s_getline_by_name (std::string filename, const char *name)
     }
 }
 
+static double
+s_round (double d)
+{
+    return (d - floor(d) > 0.5) ? ceil(d) : floor(d);
+}
 
 ////////////////////////////////////////////////////////////
 // Static functions which get metrics values
@@ -136,7 +141,7 @@ s_uptime (std::string &root_dir)
 
     linuxmetric_t *uptime_info = linuxmetric_new ();
     uptime_info->type = strdup (LINUXMETRIC_UPTIME);
-    uptime_info->value = uptime;
+    uptime_info->value = s_round (uptime);
     uptime_info->unit = "sec";
 
     return uptime_info;
@@ -167,7 +172,7 @@ s_cpu_usage (std::string &root_dir, zhashx_t *history)
 
     linuxmetric_t *cpu_usage_info = linuxmetric_new ();
     cpu_usage_info->type = strdup (LINUXMETRIC_CPU_USAGE);
-    cpu_usage_info->value = 100 - 100*((numerator - history_numerator)/(denominator - history_denominator));
+    cpu_usage_info->value = s_round (100 - 100*((numerator - history_numerator)/(denominator - history_denominator)));
     cpu_usage_info->unit = "%";
     /* update or insert numerator and denominator to history */
     *history_numerator_ptr = numerator;
@@ -185,7 +190,7 @@ s_cpu_temperature (std::string &root_dir)
 
         linuxmetric_t *cpu_temperature_info = linuxmetric_new ();
         cpu_temperature_info->type = strdup (LINUXMETRIC_CPU_TEMPERATURE);
-        cpu_temperature_info->value = temperature / 1000;
+        cpu_temperature_info->value = s_round (temperature / 1000);
         cpu_temperature_info->unit = "C";
         return cpu_temperature_info;
     }
@@ -218,7 +223,7 @@ s_meminfo (std::string &root_dir)
 
     linuxmetric_t *memory_usage_info = linuxmetric_new ();
     memory_usage_info->type = strdup (LINUXMETRIC_MEMORY_USAGE);
-    memory_usage_info->value = 100 * (memory_used / memory_total);
+    memory_usage_info->value = s_round (100 * (memory_used / memory_total));
     memory_usage_info->unit = "%";
     zlistx_add_end (meminfo, memory_usage_info);
 
@@ -238,20 +243,20 @@ s_sdcard_info (std::string &root_dir)
     double sdcard_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *sdcard_total_info = linuxmetric_new ();
     sdcard_total_info->type = strdup (LINUXMETRIC_SDCARD_TOTAL);
-    sdcard_total_info->value = sdcard_total / to_MB;
+    sdcard_total_info->value = s_round (sdcard_total / to_MB);
     sdcard_total_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_total_info);
 
     double sdcard_used = sdcard_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *sdcard_used_info = linuxmetric_new ();
     sdcard_used_info->type = strdup (LINUXMETRIC_SDCARD_USED);
-    sdcard_used_info->value = sdcard_used / to_MB;
+    sdcard_used_info->value = s_round (sdcard_used / to_MB);
     sdcard_used_info->unit = "MB";
     zlistx_add_end (sdcard_info, sdcard_used_info);
 
     linuxmetric_t *sdcard_usage_info = linuxmetric_new ();
     sdcard_usage_info->type = strdup (LINUXMETRIC_SDCARD_USAGE);
-    sdcard_usage_info->value = 100 * (sdcard_used / sdcard_total);
+    sdcard_usage_info->value = s_round (100 * (sdcard_used / sdcard_total));
     sdcard_usage_info->unit = "%";
     zlistx_add_end (sdcard_info, sdcard_usage_info);
 
@@ -270,14 +275,14 @@ s_flash_info (std::string &root_dir)
     double flash_total = buf.f_blocks * buf.f_frsize;
     linuxmetric_t *flash_total_info = linuxmetric_new ();
     flash_total_info->type = strdup (LINUXMETRIC_FLASH_TOTAL);
-    flash_total_info->value = flash_total / to_MB;
+    flash_total_info->value = s_round (flash_total / to_MB);
     flash_total_info->unit = "MB";
     zlistx_add_end (flash_info, flash_total_info);
 
     double flash_used = flash_total - buf.f_bsize * buf.f_bfree;
     linuxmetric_t *flash_used_info = linuxmetric_new ();
     flash_used_info->type = strdup (LINUXMETRIC_FLASH_USED);
-    flash_used_info->value = flash_used / to_MB;
+    flash_used_info->value = s_round (flash_used / to_MB);
     flash_used_info->unit = "MB";
     zlistx_add_end (flash_info, flash_used_info);
 
@@ -285,7 +290,7 @@ s_flash_info (std::string &root_dir)
     double flash_used_nonroot = flash_total - buf.f_bsize * buf.f_bavail;
     linuxmetric_t *flash_usage_info = linuxmetric_new ();
     flash_usage_info->type = strdup (LINUXMETRIC_FLASH_USAGE);
-    flash_usage_info->value = 100 * (flash_used_nonroot / flash_total);
+    flash_usage_info->value = s_round (100 * (flash_used_nonroot / flash_total));
     flash_usage_info->unit = "%";
     zlistx_add_end (flash_info, flash_usage_info);
 
@@ -396,7 +401,7 @@ static linuxmetric_t *
     linuxmetric_t *error_info = linuxmetric_new ();
     char *error_type = zsys_sprintf (ERROR_RATIO_TEMPLATE, direction, interface);
     error_info->type = strdup (error_type);
-    error_info->value = 100 * (errors - value_last_errors) / (packets - value_last_packets);
+    error_info->value = s_round (100 * (errors - value_last_errors) / (packets - value_last_packets));
     error_info->unit = "%";
 
     //store last value
