@@ -337,7 +337,7 @@ static zlistx_t *
     linuxmetric_t *bandwidth_info = linuxmetric_new ();
     char *bandwidth_type = zsys_sprintf (BANDWIDTH_TEMPLATE, direction, interface);
     bandwidth_info->type = strdup (bandwidth_type);
-    bandwidth_info->value = (bytes - value_last) / interval;
+    bandwidth_info->value = s_round((bytes - value_last) / interval);
     bandwidth_info->unit = "Bps";
     zlistx_add_end (network_usage_info, bandwidth_info);
 
