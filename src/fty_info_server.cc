@@ -152,7 +152,7 @@ char *s_get_name(const char *name, const char *uuid)
 //          name_uri
 //          vendor
 //          serial
-//          model
+//          product
 //          location
 //          parent_uri
 //          version
@@ -605,9 +605,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
@@ -943,9 +943,9 @@ fty_info_server_test (bool verbose)
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
         zsys_debug ("fty-info-test: serial = '%s'", serial);
-        char * model = (char *) zhash_lookup (infos, INFO_MODEL);
-        assert(model && streq (model, TST_MODEL));
-        zsys_debug ("fty-info-test: model = '%s'", model);
+        char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
+        assert(product && streq (product, TST_PRODUCT));
+        zsys_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
         zsys_debug ("fty-info-test: location = '%s'", location);
