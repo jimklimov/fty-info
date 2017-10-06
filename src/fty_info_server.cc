@@ -727,7 +727,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -800,7 +800,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_UPDATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -872,7 +872,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rack controller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);

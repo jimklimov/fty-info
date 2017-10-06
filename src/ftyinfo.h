@@ -42,7 +42,7 @@ extern "C" {
 #define TST_UUID        "ce7c523e-08bf-11e7-af17-080027d52c4f"
 #define TST_HOSTNAME    "localhost"
 #define TST_NAME        "MyIPC"
-#define TST_INAME       "ipc-001"
+#define TST_INAME       "rackcontroller-0"
 #define TST_NAME_URI    "/asset/rackcontroller-0"
 #define TST_PRODUCT     "IPC3000"
 #define TST_VENDOR      "Eaton"
