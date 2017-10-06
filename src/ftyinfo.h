@@ -69,7 +69,7 @@ extern "C" {
 //  @interface
 //  Create a new ftyinfo
 FTY_INFO_PRIVATE ftyinfo_t *
-    ftyinfo_new (topologyresolver_t *resolver);
+    ftyinfo_new (topologyresolver_t *resolver,char * path);
 
 FTY_INFO_PRIVATE ftyinfo_t *
     ftyinfo_test_new (void);
