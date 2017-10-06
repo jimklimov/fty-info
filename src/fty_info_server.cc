@@ -27,6 +27,7 @@
 */
 #define TIMEOUT_MS -1   //wait infinitelly
 #define DEFAULT_UUID    "00000000-0000-0000-0000-000000000000"  //in case of UUID being NULL
+#define DEFAULT_RC_INAME    "rackcontroller-0"
 
 #include <string>
 #include <unistd.h>
@@ -507,7 +508,7 @@ fty_info_server (zsock_t *pipe, void *args)
     }
 
     fty_info_server_t *self = info_server_new (name);
-    self->resolver = topologyresolver_new (NULL);
+    self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe (self->client), NULL);
     assert (poller);
 
