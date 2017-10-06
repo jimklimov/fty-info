@@ -11,4 +11,5 @@ malamute
     endpoint = ipc://@/malamute #   Malamute endpoint
     address = fty-info          #   Agent address
 parameters
-    path = /api/v1/admin/info   #path to get general informations from fty-info 
+    path = /api/v1/admin/info   #path to get general informations from fty-info
+ 
