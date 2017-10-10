@@ -105,14 +105,22 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
 
     const char *operation = fty_proto_operation (message);
-    if (operation && !streq (operation, "device.rackcontroller")) {
-        zsys_debug("Not device.rackcontroller");
+    if (operation && !streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
+        zsys_debug("Not FTY_PROTO_ASSET_OP_UPDATE");
+        fty_proto_destroy (&message);
+        return 0;
+    }
+
+    const char *type = fty_proto_aux_string (message, "type", "");
+    const char *subtype = fty_proto_aux_string (message, "subtype", "");
+    if (!streq (type, "device") || !streq (subtype, "rackcontroller")) {
+        zsys_debug ("Not device.rackcontroller");
         fty_proto_destroy (&message);
         return 0;
     }
 
     const char *iname = fty_proto_name(message);
-    if (NULL == iname || !(0 == streq(iname, DEFAULT_RC_INAME))) {
+    if (NULL == iname || !streq(iname, DEFAULT_RC_INAME)) {
         zsys_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy (&message);
         return 0;
