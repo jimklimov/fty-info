@@ -64,6 +64,9 @@ using namespace std;
 #define INFO_PROTOCOL_FORMAT "protocol-format"
 #define INFO_TYPE      "type"
 #define INFO_TXTVERS   "txtvers"
+#define INFO_IP1        "ip.1"
+#define INFO_IP2        "ip.2"
+#define INFO_IP3        "ip.3"
 
 // Config file accessors
 const char* s_get (zconfig_t *config, const char* key, std::string &dfl);

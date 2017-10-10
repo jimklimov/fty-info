@@ -68,11 +68,11 @@ fty_info_rc0_runonce_destroy (fty_info_rc0_runonce_t **self_p)
     if (*self_p) {
         fty_info_rc0_runonce_t *self = *self_p;
         //  Free class properties here
-        mlm_client_destroy (&self->client);
-        zstr_free(&self->name);
-        ftyinfo_destroy (&info);
-        topologyresolver_destroy (&self->resolver);
-        zstr_free(&self->endpoint);
+        mlm_client_destroy (&(self->client));
+        zstr_free(&(self->name));
+        ftyinfo_destroy (&(self->info));
+        topologyresolver_destroy (&(self->resolver));
+        zstr_free(&(self->endpoint));
         //  Free object itself
         free (self);
         *self_p = NULL;
@@ -87,7 +87,7 @@ int
 handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
 {
     if (NULL == self || NULL == msg) {
-        return 1;
+        return -1;
     }
     if (!is_fty_proto (msg)){
         zmsg_destroy (&msg);
@@ -97,7 +97,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     if (NULL == message ) {
         zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
         zmsg_destroy (&msg);
-        return 1;
+        return -1;
     }
     if (fty_proto_id (message) != FTY_PROTO_ASSET) {
         zsys_debug("Not FTY_PROTO_ASSET");
@@ -115,62 +115,131 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
 
     const char *iname = fty_proto_name(message);
-    if (NULL == iname || !streq(iname, DEFAULT_RC_INAME)) {
+    if (NULL == iname || !(0 == streq(iname, DEFAULT_RC_INAME))) {
         zsys_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy (&message);
         zmsg_destroy (&msg);
         return 0;
     }
 
-    const char *uuid = fty_proto_ext_string(asset, "uuid", NULL);
-    if (NULL == uuid) {
-        zsys_debug("We already have uuid %s for %s", uuid, DEFAULT_RC_INAME);
-        fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
-        return 0;
+    // just for rackcontroller-0
+    int change = 0;
+
+    const char *data = fty_proto_ext_string(message, "uuid", NULL);
+    if (NULL == data) {
+        if (NULL != self->info->uuid) {
+            fty_proto_ext_insert(message, "uuid", "%s", self->info->uuid);
+            change = 1;
+        }
     }
-
-    /*
-     * TODO add data to msg from -info and send it back as hinted below
-     *
-    fty_proto_ext_insert(asset, "uuid", "%s", ftyinfo_uuid(self->info));
-
-    // set name
-    const char *name = fty_proto_ext_string(asset, "hostname", NULL);
-    if (name) {
-        fty_proto_ext_insert(asset, "name", "%s", name);
-    } else {
-        name = fty_proto_aux_string(asset, "subtype", NULL);
-        if (name) {
-            fty_proto_ext_insert(asset, "name", "%s (%s)", name, ip); 
-        } else {
-            fty_proto_ext_insert(asset, "name", "%s", ip);
+    data = fty_proto_name(message);
+    if ((NULL == data) || (0 == strcmp("", data))) {
+        if (NULL != self->info->model) {
+            fty_proto_set_name(message, "%s", self->info->model);
+            change = 1;
+        }
+    }
+    data = fty_proto_ext_string(message, "manufacturer", NULL);
+    if (NULL == data) {
+        if (NULL != self->info->vendor) {
+            fty_proto_ext_insert(message, "manufacturer", "%s", self->info->vendor);
+            change = 1;
+        }
+    }
+    data = fty_proto_ext_string(message, "serial_no", NULL);
+    if (NULL == data) {
+        if (NULL != self->info->serial) {
+            fty_proto_ext_insert(message, "serial_no", "%s", self->info->serial);
+            change = 1;
+        }
+    }
+    data = fty_proto_ext_string(message, "contact_name", NULL);
+    if (NULL == data) {
+        if (NULL != self->info->contact) {
+            fty_proto_ext_insert(message, "contact_name", "%s", self->info->contact);
+            change = 1;
+        }
+    }
+    data = fty_proto_ext_string(message, "description", NULL);
+    if (NULL == data) {
+        if ((NULL != self->info->hostname) && (NULL != self->info->description) && (NULL != self->info->installDate)) {
+            fty_proto_ext_insert(message, "description", "%s\n%s\n%s",
+                    self->info->hostname, self->info->description, self->info->installDate);
+            change = 1;
+        }
+        else if ((NULL != self->info->hostname) && (NULL != self->info->description)) {
+            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->hostname, self->info->description);
+            change = 1;
+        }
+        else if ((NULL != self->info->hostname) && (NULL != self->info->installDate)) {
+            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->hostname, self->info->installDate);
+            change = 1;
+        }
+        else if ((NULL != self->info->description) && (NULL != self->info->installDate)) {
+            fty_proto_ext_insert(message, "description", "%s\n%s", self->info->description, self->info->installDate);
+            change = 1;
+        }
+        else if (NULL != self->info->hostname) {
+            fty_proto_ext_insert(message, "description", "%s", self->info->hostname);
+            change = 1;
+        }
+        else if (NULL != self->info->description) {
+            fty_proto_ext_insert(message, "description", "%s", self->info->description);
+            change = 1;
+        }
+        else if (NULL != self->info->installDate) {
+            fty_proto_ext_insert(message, "description", "%s", self->info->installDate);
+            change = 1;
         }
     }
 
-    std::time_t timestamp = std::time(NULL);
-    char mbstr[100];
-    if (std::strftime(mbstr, sizeof (mbstr), "%FT%T%z", std::localtime(&timestamp))) {
-        fty_proto_ext_insert(asset, "discovered_ts", "%s", mbstr);
+    data = fty_proto_ext_string(message, "ip.1", NULL);
+    if (NULL == data) {
+        struct ifaddrs *interfaces, *iface;
+        char host[NI_MAXHOST];
+        if (getifaddrs (&interfaces) != -1) {
+            int counter = 0;
+            for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+                if (iface->ifa_addr == NULL) continue;
+                // here we support IPv4 only, only get first 3 addresses
+                if (iface->ifa_addr->sa_family == AF_INET &&
+                        getnameinfo(iface->ifa_addr,sizeof(struct sockaddr_in),
+                                host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST) == 0) {
+                    switch(counter) {
+                        case 0:
+                            fty_proto_ext_insert(message, "ip.1", "%s", host);
+                            break;
+                        case 1:
+                            fty_proto_ext_insert(message, "ip.2", "%s", host);
+                            break;
+                        case 2:
+                            fty_proto_ext_insert(message, "ip.3", "%s", host);
+                            break;
+                    }
+                    ++counter;
+                }
+                if (counter == 3) {
+                    break;
+                }
+            }
+        }
     }
 
-    fty_proto_print(asset);
-    zsys_info("Found new asset %s with IP address %s", fty_proto_ext_string(asset, "name", ""), ip);
-    fty_proto_set_operation(asset, "create");
-
-    fty_proto_t *assetDup = fty_proto_dup(asset);
-    zmsg_t *msg = fty_proto_encode(&assetDup);
-    zsys_debug("about to send create message");
-    int rv = mlm_client_sendto(self->mlm, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msg);
-    if (rv == -1) {
-        zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
-
-    */
-
+    if (0 != change) {
+        fty_proto_t *messageDup = fty_proto_dup(message);
+        zmsg_t *msgDup = fty_proto_encode(&messageDup);
+        int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
+        if (rv == -1) {
+            zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
+            fty_proto_destroy (&message);
+            zmsg_destroy (&msg);
+            return -1;
+        }
+    }
 
     fty_proto_destroy (&message);
     zmsg_destroy (&msg);
-    return 0;
+    return 1;
 }
 
 
@@ -276,8 +345,13 @@ void fty_info_rc0_runonce (zsock_t *pipe, void *args)
                 continue;
             const char *command = mlm_client_command (self->client);
             if (streq (command, "STREAM DELIVER")) {
-                if (0 != handle_stream (self, message)) {
+                int rv = handle_stream (self, message);
+                if (0 > rv) {
                     zsys_debug("Broken stream message");
+                    break;
+                }
+                if (1 == rv) {
+                    zsys_debug("RC-0 updated, finishing");
                     break;
                 }
             }
