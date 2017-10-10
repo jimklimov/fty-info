@@ -31,8 +31,8 @@ extern "C" {
 #define SRV_NAME "IPC"
 #define SRV_TYPE "_https._tcp."
 #define SRV_STYPE "_powerservice._sub._https._tcp."
-#define SRV_PORT "443"
-#define TXT_PATH "/api/v1/comm/connections"
+#define SRV_PORT  "443"
+#define TXT_PATH  "/api/v1/comm"
 #define TXT_PROTO_FORMAT "etnrs"
 #define TXT_TYPE   "ipc"
 #define TXT_VER  "1"
@@ -44,7 +44,7 @@ extern "C" {
 #define TST_NAME        "MyIPC"
 #define TST_INAME       "ipc-001"
 #define TST_NAME_URI    "/asset/ipc-001"
-#define TST_MODEL       "IPC3000"
+#define TST_PRODUCT     "IPC3000"
 #define TST_VENDOR      "Eaton"
 #define TST_SERIAL      "LA71026006"
 #define TST_PART_NUMBER      "123456"
@@ -75,8 +75,9 @@ struct _ftyinfo_t {
     char *hostname;
     char *name;
     char *name_uri;
-    char *model;
+    char *product;
     char *vendor;
+    char *manufacturer;
     char *serial;
     char *part_number;
     char *location;

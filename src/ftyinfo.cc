@@ -167,21 +167,23 @@ ftyinfo_new (topologyresolver_t *resolver)
     self->parent_uri = topologyresolver_to_parent_uri (resolver);
     zsys_info ("fty-info:parent_uri= '%s'", self->parent_uri);
 
-    //set uuid, vendor, model, part_number, verson from /etc/release-details.json
+    //set uuid, vendor, product, part_number, verson from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
     si = s_load_release_details();
     self->uuid   = s_get_release_details (si, "uuid", NULL);
     self->vendor = s_get_release_details (si, "hardware-vendor", NULL);
+    self->manufacturer = self->vendor;
     self->serial = s_get_release_details (si, "hardware-serial-number", NULL);
-    self->model  = s_get_release_details (si, "hardware-catalog-number", NULL);
+    self->product  = s_get_release_details (si, "hardware-catalog-number", NULL);
     self->part_number  = s_get_release_details (si, "hardware-part-number", NULL);
     self->version   = s_get_release_details (si, "osimage-name", NULL);
-    zsys_info ("fty-info:uuid      = '%s'", self->uuid);
-    zsys_info ("fty-info:vendor    = '%s'", self->vendor);
-    zsys_info ("fty-info:serial    = '%s'", self->serial);
-    zsys_info ("fty-info:model     = '%s'", self->model);
-    zsys_info ("fty-info:part_number     = '%s'", self->part_number);
-    zsys_info ("fty-info:version     = '%s'", self->version);
+    zsys_info ("fty-info:uuid         = '%s'", self->uuid);
+    zsys_info ("fty-info:vendor       = '%s'", self->vendor);
+    zsys_info ("fty-info:manufacturer = '%s'", self->manufacturer);
+    zsys_info ("fty-info:serial       = '%s'", self->serial);
+    zsys_info ("fty-info:product        = '%s'", self->product);
+    zsys_info ("fty-info:part_number  = '%s'", self->part_number);
+    zsys_info ("fty-info:version      = '%s'", self->version);
 
     // set description, contact
     self->description = topologyresolver_to_description (resolver);
@@ -251,7 +253,7 @@ ftyinfo_test_new (void)
     self->hostname  = strdup (TST_HOSTNAME);
     self->name      = strdup (TST_NAME);
     self->name_uri  = strdup (TST_NAME_URI);
-    self->model     = strdup (TST_MODEL);
+    self->product     = strdup (TST_PRODUCT);
     self->vendor    = strdup (TST_VENDOR);
     self->serial    = strdup (TST_SERIAL);
     self->part_number    = strdup (TST_PART_NUMBER);
@@ -286,7 +288,7 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         if (&self->hostname) zstr_free (&self->hostname);
         if (&self->name)  zstr_free (&self->name);
         if (&self->name_uri) zstr_free (&self->name_uri);
-        if (&self->model) zstr_free (&self->model);
+        if (&self->product) zstr_free (&self->product);
         if (&self->vendor) zstr_free (&self->vendor);
         if (&self->serial) zstr_free (&self->serial);
         if (&self->part_number) zstr_free (&self->part_number);
@@ -327,7 +329,8 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     if (self->name) zhash_insert(self->infos, INFO_NAME, self->name);
     if (self->name_uri) zhash_insert(self->infos, INFO_NAME_URI, self->name_uri);
     if (self->vendor) zhash_insert(self->infos, INFO_VENDOR, self->vendor);
-    if (self->model) zhash_insert(self->infos, INFO_MODEL, self->model);
+    if (self->manufacturer) zhash_insert(self->infos, INFO_MANUFACTURER, self->manufacturer);
+    if (self->product) zhash_insert(self->infos, INFO_PRODUCT, self->product);
     if (self->serial) zhash_insert(self->infos, INFO_SERIAL, self->serial);
     if (self->part_number) zhash_insert(self->infos, INFO_PART_NUMBER, self->part_number);
     if (self->location) zhash_insert(self->infos, INFO_LOCATION, self->location);

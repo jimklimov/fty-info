@@ -134,15 +134,15 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
     data = fty_proto_name(message);
     if ((NULL == data) || (0 == strcmp("", data))) {
-        if (NULL != self->info->model) {
-            fty_proto_set_name(message, "%s", self->info->model);
+        if (NULL != self->info->product) {
+            fty_proto_set_name(message, "%s", self->info->product);
             change = 1;
         }
     }
     data = fty_proto_ext_string(message, "manufacturer", NULL);
     if (NULL == data) {
-        if (NULL != self->info->vendor) {
-            fty_proto_ext_insert(message, "manufacturer", "%s", self->info->vendor);
+        if (NULL != self->info->manufacturer) {
+            fty_proto_ext_insert(message, "manufacturer", "%s", self->info->manufacturer);
             change = 1;
         }
     }
