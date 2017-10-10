@@ -96,13 +96,11 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     fty_proto_t *message = fty_proto_decode (&msg);
     if (NULL == message ) {
         zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
-        zmsg_destroy (&msg);
         return -1;
     }
     if (fty_proto_id (message) != FTY_PROTO_ASSET) {
         zsys_debug("Not FTY_PROTO_ASSET");
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
         return 0;
     }
 
@@ -110,7 +108,6 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     if (operation && !streq (operation, "device.rackcontroller")) {
         zsys_debug("Not device.rackcontroller");
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
         return 0;
     }
 
@@ -118,7 +115,6 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     if (NULL == iname || !(0 == streq(iname, DEFAULT_RC_INAME))) {
         zsys_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy (&message);
-        zmsg_destroy (&msg);
         return 0;
     }
 
@@ -232,13 +228,11 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
         if (rv == -1) {
             zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
             fty_proto_destroy (&message);
-            zmsg_destroy (&msg);
             return -1;
         }
     }
 
     fty_proto_destroy (&message);
-    zmsg_destroy (&msg);
     return 1;
 }
 
