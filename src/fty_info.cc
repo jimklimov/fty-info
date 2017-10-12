@@ -53,6 +53,7 @@ int main (int argc, char *argv [])
     zconfig_t *config = NULL;
     char* actor_name = NULL;
     char* endpoint = NULL;
+    char* path = NULL;
     bool verbose = false;
     int argn;
 
@@ -108,11 +109,14 @@ int main (int argc, char *argv [])
         if (endpoint) zstr_free(&endpoint);
         endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
         actor_name = strdup(s_get (config, "malamute/address", NULL));
+        path = strdup(s_get (config, "parameters/path", NULL));
     }
     if (actor_name == NULL)
         actor_name = strdup(FTY_INFO_AGENT);
     if (endpoint == NULL)
         endpoint = strdup("ipc://@/malamute");
+    if (path == NULL)
+        path = strdup(DEFAULT_PATH);
 
     // Check env. variables
     if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
@@ -126,6 +130,7 @@ int main (int argc, char *argv [])
         zsys_info ("fty_info - Agent which returns rack controller information");
     }
 
+    zstr_sendx (server, "PATH", path, NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
@@ -151,6 +156,7 @@ int main (int argc, char *argv [])
     zactor_destroy (&rc0_runonce);
     zstr_free(&actor_name);
     zstr_free(&endpoint);
+    zstr_free(&path);
     zconfig_destroy (&config);
 
     return 0;

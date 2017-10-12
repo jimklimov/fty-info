@@ -129,7 +129,7 @@ s_get_release_details
 //  Create a new ftyinfo
 
 ftyinfo_t *
-ftyinfo_new (topologyresolver_t *resolver)
+ftyinfo_new (topologyresolver_t *resolver,char *path)
 {
     ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
     self->infos = zhash_new();
@@ -200,7 +200,7 @@ ftyinfo_new (topologyresolver_t *resolver)
     zstr_free (&license);
 
     // use default
-    self->path = strdup (TXT_PATH);
+    self->path = strdup (path);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);
@@ -263,7 +263,7 @@ ftyinfo_test_new (void)
     self->description = strdup (TST_DESCRIPTION);
     self->contact = strdup (TST_CONTACT);
     self->installDate = strdup (TST_INSTALL_DATE);
-    self->path      = strdup (TXT_PATH);
+    self->path      = strdup (DEFAULT_PATH);
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type      = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);

@@ -53,7 +53,7 @@ fty_info_rc0_runonce_new (char *name)
     self->client = mlm_client_new ();
     self->verbose=false;
     self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
-    self->info = ftyinfo_new (self->resolver);
+    self->info = ftyinfo_new (self->resolver, DEFAULT_PATH);
     return self;
 }
 

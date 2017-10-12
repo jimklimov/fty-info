@@ -41,6 +41,7 @@ struct _fty_info_server_t {
     //  Declare class properties here
     char* name;
     char* endpoint;
+    char* path;
     mlm_client_t *client;
     mlm_client_t *announce_client;
     mlm_client_t *info_client;
@@ -111,6 +112,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         mlm_client_destroy (&self->info_client);
         zstr_free(&self->name);
         zstr_free(&self->endpoint);
+        zstr_free(&self->path);
         topologyresolver_destroy (&self->resolver);
         zhashx_destroy(&self->history);
         //  Free object itself
@@ -196,7 +198,7 @@ s_publish_announce(fty_info_server_t  * self)
         return;
     ftyinfo_t *info;
     if (!self->announce_test) {
-        info = ftyinfo_new (self->resolver);
+        info = ftyinfo_new (self->resolver,self->path);
     }
     else
         info = ftyinfo_test_new ();
@@ -305,6 +307,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     if (streq (command, "VERBOSE")) {
         self->verbose = true;
         zsys_debug ("fty-info: VERBOSE=true");
+    }
+    else
+    if (streq (command, "PATH")) {
+        char *path = zmsg_popstr (message);
+
+        if (path) {
+            self->path = strdup(path);
+            zsys_debug ("fty-info: PATH: %s", self->path);
+        }
+        zstr_free (&path);
     }
     else
     if (streq (command, "CONSUMER")) {
@@ -454,7 +466,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         char *zuuid = zmsg_popstr (message);
         ftyinfo_t *info;
         if (streq(command, "INFO")) {
-            info = ftyinfo_new (self->resolver);
+            info = ftyinfo_new (self->resolver,self->path);
         }
         if (streq(command, "INFO-TEST")) {
             info = ftyinfo_test_new ();
@@ -549,6 +561,7 @@ fty_info_server_test (bool verbose)
     zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
     if (verbose)
         zstr_send (info_server, "VERBOSE");
+    zstr_sendx (info_server, "PATH", DEFAULT_PATH, NULL);
     zstr_sendx (info_server, "CONNECT", endpoint, NULL);
     zstr_sendx (info_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
 	zclock_sleep (1000);
@@ -618,7 +631,7 @@ fty_info_server_test (bool verbose)
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
-        assert(rest_root && streq (rest_root, TXT_PATH));
+        assert(rest_root && streq (rest_root, DEFAULT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
@@ -700,7 +713,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -773,7 +786,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_UPDATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rackcontroller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rackcontroller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -845,7 +858,7 @@ fty_info_server_test (bool verbose)
                 FTY_PROTO_ASSET_OP_CREATE,
                 ext);
 
-        int rv = mlm_client_send (asset_generator, "device.rack controller@ipc-001", &msg);
+        int rv = mlm_client_send (asset_generator, "device.rack controller@rackcontroller-0", &msg);
         assert (rv == 0);
         zhash_destroy (&aux);
         zhash_destroy (&ext);
@@ -956,7 +969,7 @@ fty_info_server_test (bool verbose)
         assert(version && streq (version, TST_VERSION));
         zsys_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
-        assert(rest_root && streq (rest_root, TXT_PATH));
+        assert(rest_root && streq (rest_root, DEFAULT_PATH));
         zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
 
 
