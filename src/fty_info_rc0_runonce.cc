@@ -226,6 +226,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
                     break;
                 }
             }
+            freeifaddrs(interfaces);
         }
     }
 
