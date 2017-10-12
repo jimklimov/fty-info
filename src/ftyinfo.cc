@@ -129,7 +129,7 @@ s_get_release_details
 //  Create a new ftyinfo
 
 ftyinfo_t *
-ftyinfo_new (topologyresolver_t *resolver,char *path)
+ftyinfo_new (topologyresolver_t *resolver, const char *path)
 {
     ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
     self->infos = zhash_new();

@@ -96,7 +96,7 @@ struct _ftyinfo_t {
 //  @interface
 //  Create a new ftyinfo
 FTY_INFO_PRIVATE ftyinfo_t *
-    ftyinfo_new (topologyresolver_t *resolver,char * path);
+    ftyinfo_new (topologyresolver_t *resolver, const char * path);
 
 FTY_INFO_PRIVATE ftyinfo_t *
     ftyinfo_test_new (void);
