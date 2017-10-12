@@ -34,32 +34,6 @@
 #include <set>
 #include <map>
 
-//  Structure of our class
-
-struct _ftyinfo_t {
-    zhash_t *infos;
-    char *id;
-    char *uuid;
-    char *hostname;
-    char *name;
-    char *name_uri;
-    char *product;
-    char *vendor;
-    char *manufacturer;
-    char *serial;
-    char *part_number;
-    char *location;
-    char *parent_uri;
-    char *version;
-    char *description;
-    char *contact;
-    char *installDate;
-    char *path;
-    char *protocol_format;
-    char *type;
-    char *txtvers;
-};
-
 static const char* EV_DATA_DIR = "DATADIR";
 
 static int
@@ -155,7 +129,7 @@ s_get_release_details
 //  Create a new ftyinfo
 
 ftyinfo_t *
-ftyinfo_new (topologyresolver_t *resolver,char *path)
+ftyinfo_new (topologyresolver_t *resolver, const char *path)
 {
     ftyinfo_t *self = (ftyinfo_t *) zmalloc (sizeof (ftyinfo_t));
     self->infos = zhash_new();
@@ -234,6 +208,30 @@ ftyinfo_new (topologyresolver_t *resolver,char *path)
     zsys_info ("fty-info:protocol_format = '%s'", self->protocol_format);
     zsys_info ("fty-info:type = '%s'", self->type);
     zsys_info ("fty-info:txtvers = '%s'", self->txtvers);
+
+    // search for IPv4 addresses
+    int counter = 0;
+    for (counter = 0; counter < 3; ++counter) {
+        self->ip[counter] = NULL;
+    }
+    counter = 0;
+    struct ifaddrs *interfaces, *iface;
+    char host[NI_MAXHOST];
+    if (getifaddrs (&interfaces) != -1) {
+        for (iface = interfaces; iface != NULL; iface = iface->ifa_next) {
+            if (iface->ifa_addr == NULL) continue;
+            // here we support IPv4 only, only get first 3 addresses
+            if (iface->ifa_addr->sa_family == AF_INET &&
+                    0 == getnameinfo(iface->ifa_addr,sizeof(struct sockaddr_in),
+                            host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST)) {
+                self->ip[counter] = strdup(host);
+                ++counter;
+            }
+            if (counter == 3) {
+                break;
+            }
+        }
+    }
 
     if(si)
         delete si;
@@ -345,6 +343,9 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     if (self->protocol_format) zhash_insert(self->infos, INFO_PROTOCOL_FORMAT, self->protocol_format);
     if (self->type) zhash_insert(self->infos, INFO_TYPE, self->type);
     if (self->txtvers) zhash_insert(self->infos, INFO_TXTVERS, self->txtvers);
+    if (self->ip[0]) zhash_insert(self->infos, INFO_IP1, self->ip[0]);
+    if (self->ip[1]) zhash_insert(self->infos, INFO_IP2, self->ip[1]);
+    if (self->ip[2]) zhash_insert(self->infos, INFO_IP3, self->ip[2]);
 
     return self->infos;
 }

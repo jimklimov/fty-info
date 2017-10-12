@@ -41,7 +41,9 @@ using namespace std;
 #define DEFAULT_LINUXMETRICS_INTERVAL_SEC   30
 
 // TODO: get from config
-// #define TIMEOUT_MS -1   //wait infinitely
+#define TIMEOUT_MS              -1   //wait infinitely
+#define DEFAULT_UUID            "00000000-0000-0000-0000-000000000000"  //in case of UUID being NULL
+#define DEFAULT_RC_INAME        "rackcontroller-0"
 #define INFO_ID                 "id"
 #define INFO_UUID               "uuid"
 #define INFO_HOSTNAME           "hostname"
@@ -63,7 +65,9 @@ using namespace std;
 #define INFO_PROTOCOL_FORMAT    "protocol-format"
 #define INFO_TYPE               "type"
 #define INFO_TXTVERS            "txtvers"
-
+#define INFO_IP1                "ip.1"
+#define INFO_IP2                "ip.2"
+#define INFO_IP3                "ip.3"
 
 // Config file accessors
 const char* s_get (zconfig_t *config, const char* key, std::string &dfl);

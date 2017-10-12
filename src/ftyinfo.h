@@ -66,10 +66,37 @@ extern "C" {
 #define HIST_CPU_DENOMINATOR	"cpu_usage_denominator"
 #define NETWORK_HISTORY_PREFIX	"network_history"
 
+//  Structure of our class
+
+struct _ftyinfo_t {
+    zhash_t *infos;
+    char *id;
+    char *uuid;
+    char *hostname;
+    char *name;
+    char *name_uri;
+    char *product;
+    char *vendor;
+    char *manufacturer;
+    char *serial;
+    char *part_number;
+    char *location;
+    char *parent_uri;
+    char *version;
+    char *description;
+    char *contact;
+    char *installDate;
+    char *path;
+    char *protocol_format;
+    char *type;
+    char *txtvers;
+    char *ip[3];
+};
+
 //  @interface
 //  Create a new ftyinfo
 FTY_INFO_PRIVATE ftyinfo_t *
-    ftyinfo_new (topologyresolver_t *resolver,char * path);
+    ftyinfo_new (topologyresolver_t *resolver, const char * path);
 
 FTY_INFO_PRIVATE ftyinfo_t *
     ftyinfo_test_new (void);
