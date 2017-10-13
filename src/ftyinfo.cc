@@ -231,6 +231,7 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
                 break;
             }
         }
+        freeifaddrs(interfaces);
     }
 
     if(si)
@@ -302,6 +303,8 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         if (&self->protocol_format) zstr_free (&self->protocol_format);
         if (&self->type) zstr_free (&self->type);
         if (&self->txtvers) zstr_free (&self->txtvers);
+        for (size_t i = 0; i < sizeof(self->ip) / sizeof(self->ip[0]); ++i)
+                free(self->ip[i]);
         // Free object itself
         free (self);
         *self_ptr = NULL;
