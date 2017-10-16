@@ -28,6 +28,8 @@
 
 #include "fty_info_classes.h"
 
+#define RC0_RUNONCE_ACTOR "fty-info-rc0-runonce"
+
 static int
 s_linuxmetrics_event (zloop_t *loop, int timer_id, void *output)
 {
@@ -139,7 +141,7 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
     // Run once actor to fill data about rackcontroller-0
-    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void*) actor_name);
+    zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void *) RC0_RUNONCE_ACTOR);
     if (verbose) {
         zstr_sendx (rc0_runonce, "VERBOSE", NULL);
     }
