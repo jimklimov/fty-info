@@ -294,6 +294,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char *endpoint = zmsg_popstr (message);
 
         if (endpoint) {
+            topologyresolver_set_endpoint (self->resolver, endpoint);
             self->endpoint = strdup(endpoint);
             zsys_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
