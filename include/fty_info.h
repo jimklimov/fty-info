@@ -39,6 +39,7 @@ using namespace std;
 #define DEFAULT_PATH    "/api/v1/admin/info"
 #define DEFAULT_ANNOUNCE_INTERVAL_SEC   60
 #define DEFAULT_LINUXMETRICS_INTERVAL_SEC   30
+#define STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC   "30"
 
 // TODO: get from config
 #define TIMEOUT_MS              -1   //wait infinitely
