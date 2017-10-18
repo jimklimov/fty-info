@@ -50,7 +50,7 @@ usage(){
 int main (int argc, char *argv [])
 {
     int linuxmetrics_interval = DEFAULT_LINUXMETRICS_INTERVAL_SEC;
-    const char *str_linuxmetrics_interval = NULL;
+    char *str_linuxmetrics_interval = NULL;
     char *config_file = NULL;
     zconfig_t *config = NULL;
     char* actor_name = NULL;
@@ -102,8 +102,8 @@ int main (int argc, char *argv [])
             verbose = true;
         }
 
-	 // Linux metrics publishing interval (in seconds)
-        str_linuxmetrics_interval = s_get (config, "server/check_interval", "30");
+        // Linux metrics publishing interval (in seconds)
+        str_linuxmetrics_interval = strdup(s_get (config, "server/check_interval", "30"));
         if (str_linuxmetrics_interval) {
             linuxmetrics_interval = atoi (str_linuxmetrics_interval);
         }
@@ -113,12 +113,15 @@ int main (int argc, char *argv [])
         actor_name = strdup(s_get (config, "malamute/address", NULL));
         path = strdup(s_get (config, "parameters/path", NULL));
     }
+    // Sanity checks
     if (actor_name == NULL)
         actor_name = strdup(FTY_INFO_AGENT);
     if (endpoint == NULL)
         endpoint = strdup("ipc://@/malamute");
     if (path == NULL)
         path = strdup(DEFAULT_PATH);
+    if (str_linuxmetrics_interval == NULL)
+        str_linuxmetrics_interval = strdup(STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
     // Check env. variables
     if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
@@ -159,6 +162,7 @@ int main (int argc, char *argv [])
     zstr_free(&actor_name);
     zstr_free(&endpoint);
     zstr_free(&path);
+    zstr_free(&str_linuxmetrics_interval);
     zconfig_destroy (&config);
 
     return 0;
