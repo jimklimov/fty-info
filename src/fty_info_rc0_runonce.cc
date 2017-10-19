@@ -1,21 +1,21 @@
 /*  =========================================================================
     fty_info_rc0_runonce - Run once actor to update rackcontroller-0 (SN, ...)
 
-    Copyright (C) 2014 - 2017 Eaton                                        
-                                                                           
-    This program is free software; you can redistribute it and/or modify   
-    it under the terms of the GNU General Public License as published by   
-    the Free Software Foundation; either version 2 of the License, or      
-    (at your option) any later version.                                    
-                                                                           
-    This program is distributed in the hope that it will be useful,        
-    but WITHOUT ANY WARRANTY; without even the implied warranty of         
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
-    GNU General Public License for more details.                           
-                                                                           
+    Copyright (C) 2014 - 2017 Eaton
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.            
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
     =========================================================================
 */
 
@@ -233,6 +233,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     if (0 != change) {
         fty_proto_t *messageDup = fty_proto_dup(message);
         zmsg_t *msgDup = fty_proto_encode(&messageDup);
+        zmsg_pushstrf (msgDup, "%s", "READWRITE");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
             zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
@@ -270,14 +271,14 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
     else
     if (streq(command, "CONNECT")) {
         char *endpoint = zmsg_popstr (message);
-    
+
         if (endpoint) {
             self->endpoint = strdup(endpoint);
             zsys_debug ("fty-info-rc0-runonce: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
                 zsys_error("mlm_client_connect failed\n");
-    
+
         }
         zstr_free (&endpoint);
     }
@@ -299,7 +300,7 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
     }
     else
         zsys_error ("fty-info-rc0-runonce: Unknown actor command: %s.\n", command);
-    
+
     zstr_free (&command);
     zmsg_destroy (&message);
     return 0;
