@@ -438,7 +438,7 @@ topologyresolver_to_list (topologyresolver_t *self)
         if (! parent) break;
         if (! zhashx_lookup (self->assets, parent)) {
             // ask ASSET_AGENT for ASSET_DETAIL
-            if (self->client) {
+            if (mlm_client_connected (self->client)) {
                 zsys_debug ("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
                 mlm_client_sendtox (self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", parent, NULL);
                 zmsg_t *parent_msg = mlm_client_recv (self->client);

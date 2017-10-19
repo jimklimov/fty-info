@@ -47,8 +47,7 @@ struct _fty_info_server_t {
     mlm_client_t *info_client;
     bool verbose;
     bool first_announce;
-    bool announce_test;
-    bool metrics_test;
+    bool test;
     topologyresolver_t* resolver;
     int linuxmetrics_interval;
     std::string root_dir; //directory to be considered / - used for testing
@@ -88,8 +87,7 @@ info_server_new (char *name)
     self->info_client = mlm_client_new ();
     self->verbose=false;
     self->first_announce=true;
-    self->announce_test=false;
-    self->metrics_test=false;
+    self->test = false;
     self->history = zhashx_new();
     self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     zhashx_set_destructor(self->history, history_destructor);
@@ -197,7 +195,7 @@ s_publish_announce(fty_info_server_t  * self)
     if(!mlm_client_connected(self->announce_client))
         return;
     ftyinfo_t *info;
-    if (!self->announce_test) {
+    if (!self->test) {
         info = ftyinfo_new (self->resolver,self->path);
     }
     else
@@ -233,7 +231,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
         (self->linuxmetrics_interval,
          self->history,
          self->root_dir,
-         self->metrics_test);
+         self->test);
 
     int ttl = 3 * self->linuxmetrics_interval; // in seconds
     char *rc_iname = topologyresolver_id (self->resolver);
@@ -294,7 +292,8 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char *endpoint = zmsg_popstr (message);
 
         if (endpoint) {
-            topologyresolver_set_endpoint (self->resolver, endpoint);
+            if (!self->test)
+                topologyresolver_set_endpoint (self->resolver, endpoint);
             self->endpoint = strdup(endpoint);
             zsys_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
@@ -334,8 +333,8 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     if (streq (command, "PRODUCER")) {
         char* stream = zmsg_popstr (message);
         if (streq (stream, "ANNOUNCE-TEST") || streq (stream, "ANNOUNCE")) {
-            self->announce_test = streq(stream,"ANNOUNCE-TEST");
-            if (!self->announce_test) {
+            self->test = streq(stream,"ANNOUNCE-TEST");
+            if (!self->test) {
                 zmsg_t *republish = zmsg_new ();
                 int rv = mlm_client_sendto (self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
                 if ( rv != 0) {
@@ -355,7 +354,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 s_publish_announce(self);
         }
         else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
-            self->metrics_test = streq(stream,"METRICS-TEST");
+            self->test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
                     zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
@@ -386,6 +385,9 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         zsys_info ("Will be using %s as root dir for finding out Linux metrics", root_dir);
         self->root_dir.assign (root_dir);
         zstr_free (&root_dir);
+    }
+    else if (streq (command, "TEST")) {
+        self->test = true;
     }
     else if (streq (command, "ANNOUNCE")) {
         s_publish_announce (self);
@@ -562,6 +564,7 @@ fty_info_server_test (bool verbose)
     zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
     if (verbose)
         zstr_send (info_server, "VERBOSE");
+    zstr_sendx (info_server, "TEST", NULL);
     zstr_sendx (info_server, "PATH", DEFAULT_PATH, NULL);
     zstr_sendx (info_server, "CONNECT", endpoint, NULL);
     zstr_sendx (info_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
