@@ -439,13 +439,24 @@ topologyresolver_to_list (topologyresolver_t *self)
         if (! zhashx_lookup (self->assets, parent)) {
             // ask ASSET_AGENT for ASSET_DETAIL
             if (mlm_client_connected (self->client)) {
+                zuuid_t *uuid = zuuid_new ();
                 zsys_debug ("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
-                mlm_client_sendtox (self->client, FTY_ASSET_AGENT, "ASSET_DETAIL", "GET", parent, NULL);
+                mlm_client_sendtox (self->client, FTY_ASSET_AGENT, "ASSET_DETAIL",
+                        "GET", zuuid_str_canonical (uuid), parent, NULL);
                 zmsg_t *parent_msg = mlm_client_recv (self->client);
-                if (parent_msg && fty_proto_is (parent_msg)) {
-                    fty_proto_t *parent_fmsg = fty_proto_decode (&parent_msg);
-                    zhashx_update (self->assets, parent, parent_fmsg);
-                    zlistx_add_start (list, (void *)parent);
+                if (parent_msg) {
+                    char *rcv_uuid = zmsg_popstr (parent_msg);
+                    if (0 == strcmp (rcv_uuid, zuuid_str_canonical (uuid)) && fty_proto_is (parent_msg)) {
+                        fty_proto_t *parent_fmsg = fty_proto_decode (&parent_msg);
+                        zhashx_update (self->assets, parent, parent_fmsg);
+                        zlistx_add_start (list, (void *)parent);
+                    }
+                    else {
+                        // parent is unknown, topology is not complete
+                        zlistx_purge (list);
+                        break;
+                    }
+                    zstr_free(&rcv_uuid);
                 }
                 else {
                     // parent is unknown, topology is not complete
