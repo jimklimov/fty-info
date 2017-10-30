@@ -452,7 +452,7 @@ topologyresolver_to_list (topologyresolver_t *self)
                         zlistx_add_start (list, (void *)parent);
                     }
                     else {
-                        // parent is unknown, topology is not complete
+                        // invalid zuuid or unknown parent, topology is not complete
                         zlistx_purge (list);
                         break;
                     }
