@@ -463,6 +463,7 @@ topologyresolver_to_list (topologyresolver_t *self)
                     zlistx_purge (list);
                     break;
                 }
+                zuuid_destroy (&uuid);
             }
             else {
                 // parent is unknown, topology is not complete
