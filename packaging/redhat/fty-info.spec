@@ -1,21 +1,21 @@
 #
 #    fty-info - Agent which returns rack controller information
 #
-#    Copyright (C) 2014 - 2017 Eaton                                        
-#                                                                           
-#    This program is free software; you can redistribute it and/or modify   
-#    it under the terms of the GNU General Public License as published by   
-#    the Free Software Foundation; either version 2 of the License, or      
-#    (at your option) any later version.                                    
-#                                                                           
-#    This program is distributed in the hope that it will be useful,        
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of         
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
-#    GNU General Public License for more details.                           
-#                                                                           
+#    Copyright (C) 2014 - 2017 Eaton
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
 #    You should have received a copy of the GNU General Public License along
 #    with this program; if not, write to the Free Software Foundation, Inc.,
-#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.            
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
 # To build with draft APIs, use "--with drafts" in rpmbuild for local builds or add
@@ -28,6 +28,7 @@
 %else
 %define DRAFTS no
 %endif
+%define SYSTEMD_UNIT_DIR %(pkg-config --variable=systemdsystemunitdir systemd)
 Name:           fty-info
 Version:        1.0.0
 Release:        1
@@ -50,11 +51,12 @@ BuildRequires:  systemd
 %{?systemd_requires}
 BuildRequires:  xmlto
 BuildRequires:  gcc-c++
+BuildRequires:  libsodium-devel
 BuildRequires:  zeromq-devel
 BuildRequires:  czmq-devel
 BuildRequires:  malamute-devel
-BuildRequires:  cxxtools-devel
 BuildRequires:  fty-proto-devel
+BuildRequires:  cxxtools-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -78,11 +80,12 @@ This package contains shared library for fty-info: agent which returns rack cont
 Summary:        agent which returns rack controller information
 Group:          System/Libraries
 Requires:       libfty_info1 = %{version}
+Requires:       libsodium-devel
 Requires:       zeromq-devel
 Requires:       czmq-devel
 Requires:       malamute-devel
-Requires:       cxxtools-devel
 Requires:       fty-proto-devel
+Requires:       cxxtools-devel
 
 %description devel
 agent which returns rack controller information development tools
@@ -118,7 +121,7 @@ find %{buildroot} -name '*.la' | xargs rm -f
 %{_bindir}/fty-info
 %{_mandir}/man1/fty-info*
 %config(noreplace) %{_sysconfdir}/fty-info/fty-info.cfg
-/usr/lib/systemd/system/fty-info.service
+%{SYSTEMD_UNIT_DIR}/fty-info.service
 %dir %{_sysconfdir}/fty-info
 %if 0%{?suse_version} > 1315
 %post
