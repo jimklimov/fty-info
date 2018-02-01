@@ -136,6 +136,7 @@ int main (int argc, char *argv [])
     }
 
     zstr_sendx (server, "PATH", path, NULL);
+    zstr_sendx (server, "GONFIG", "/usr/share/fty", NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);

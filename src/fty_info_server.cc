@@ -52,6 +52,7 @@ struct _fty_info_server_t {
     int linuxmetrics_interval;
     std::string root_dir; //directory to be considered / - used for testing
     zhashx_t *history;
+    char *hw_cap_path;
 };
 
 // this is kept for to handle with values set to ""
@@ -89,6 +90,7 @@ info_server_new (char *name)
     self->first_announce=true;
     self->test = false;
     self->history = zhashx_new();
+    self->hw_cap_path = NULL;
     self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     zhashx_set_destructor(self->history, history_destructor);
     zhashx_insert(self->history, HIST_CPU_NUMERATOR, numerator_ptr);
@@ -113,6 +115,7 @@ info_server_destroy (fty_info_server_t  **self_p)
         zstr_free(&self->path);
         topologyresolver_destroy (&self->resolver);
         zhashx_destroy(&self->history);
+        zstr_free(&self->hw_cap_path);
         //  Free object itself
         delete self;
         *self_p = NULL;
@@ -395,6 +398,11 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else if (streq (command, "LINUXMETRICS")) {
         s_publish_linuxmetrics (self);
     }
+    else if (streq (command, "CONFIG")) {
+        self->hw_cap_path = zmsg_popstr (message);
+        if (!self->hw_cap_path)
+            zsys_error ("%s hw_cap_path missing", command);
+    }
     else
         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
 
@@ -411,6 +419,53 @@ void fty_msg_free_fn(void *data)
     fty_proto_t *msg = (fty_proto_t *)data;
     fty_proto_destroy (&msg);
 }
+
+//  --------------------------------------------------------------------------
+// return zmsg_t with hw_ capability info or NULL if info cannot be retrieved
+static zmsg_t*
+s_hw_cap (fty_info_server_t *self, const char *type)
+{
+    zmsg_t *msg = zmsg_new ();
+    zconfig_t *cap = zconfig_load (self->hw_cap_path);
+    if (!cap)
+        return msg;
+
+    char *path = zsys_sprintf ("hardware/%s/count", type);
+    const char *count = s_get (cap, path, "");
+
+
+    if (streq (type, "gpi"))
+    {
+        zmsg_addstr (msg, count);
+
+        if (streq (count, "0"))
+        {
+            zconfig_destroy (&cap);
+            zstr_free (&path);
+            return msg;
+        }
+
+
+    }
+    else
+    if (streq (type, "gpo"))
+    {
+
+    }
+    else
+    if (streq (type, "serial"))
+    {
+        // not implemented
+    }
+    else
+    {
+
+    }
+
+    zconfig_destroy (&cap);
+    return msg;
+}
+
 
 //  --------------------------------------------------------------------------
 //  process message from FTY_PROTO_ASSET stream
@@ -443,49 +498,64 @@ s_handle_stream (fty_info_server_t* self, zmsg_t *message)
 }
 
 //  --------------------------------------------------------------------------
-//  process message from MAILBOX DELIVER INFO INFO/INFO-TEST
+//  process message from MAILBOX DELIVER
 void static
 s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
 {
     char *command = zmsg_popstr (message);
     if (!command) {
         zmsg_destroy (&message);
-        zsys_warning ("Empty subject.");
+        zsys_warning ("Empty command.");
         return;
     }
-    //we assume all request command are MAILBOX DELIVER, and subject="info"
-    if (!streq(command, "INFO") && !streq(command, "INFO-TEST")) {
-        char *zuuid = zmsg_popstr (message);
-        zsys_warning ("fty-info: Received unexpected command '%s'", command);
-        zmsg_t *reply = zmsg_new ();
-        if (NULL != zuuid)
-            zmsg_addstr(reply, zuuid);
-        zmsg_addstr(reply, "ERROR");
-        zmsg_addstr (reply, "unexpected command");
-        mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
-        zstr_free (&command);
-        zmsg_destroy (&message);
-        return;
-    }
-    else {
-        zsys_debug ("fty-info:do '%s'", command);
-        char *zuuid = zmsg_popstr (message);
-        ftyinfo_t *info;
-        if (streq(command, "INFO")) {
-            info = ftyinfo_new (self->resolver,self->path);
-        }
-        if (streq(command, "INFO-TEST")) {
-            info = ftyinfo_test_new ();
-        }
 
-        zmsg_t *reply = s_create_info (info);
+    char *zuuid = zmsg_popstr (message);
+    zmsg_t *reply = NULL;
+
+
+    //we assume all request command are MAILBOX DELIVER, and subject="info"
+    if (streq (command, "INFO")) {
+        ftyinfo_t *info= ftyinfo_new (self->resolver,self->path);
+
+        reply = s_create_info (info);
         zmsg_pushstrf (reply, "%s", zuuid);
-        mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
-        zstr_free (&zuuid);
         ftyinfo_destroy (&info);
     }
+    else
+    if (streq (command, "INFO-TEST")) {
+        ftyinfo_t *info = ftyinfo_test_new ();
+
+        reply = s_create_info (info);
+        zmsg_pushstrf (reply, "%s", zuuid);
+        ftyinfo_destroy (&info);
+    }
+
+    else
+    if (streq (command, "HW_CAP")) {
+        /* handle hw_cap*/
+        const char *type = zmsg_popstr (message);
+        reply = s_hw_cap (self, type);
+
+        zmsg_pushstrf (reply, "%s", zuuid);
+    }
+    else {
+        zsys_warning ("fty-info: Received unexpected command '%s'", command);
+        if (NULL != zuuid)
+            zmsg_addstr (reply, zuuid);
+
+        zmsg_addstr (reply, "ERROR");
+        zmsg_addstr (reply, "unexpected command");
+    }
+
+    int rv = mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
+    if (rv != 0)
+        zsys_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
+
+    zstr_free (&zuuid);
     zstr_free (&command);
     zmsg_destroy (&message);
+
+    return;
 
 }
 //  --------------------------------------------------------------------------
