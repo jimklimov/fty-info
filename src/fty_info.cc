@@ -137,7 +137,7 @@ int main (int argc, char *argv [])
     }
 
     zstr_sendx (server, "PATH", path, NULL);
-    zstr_sendx (server, "GONFIG", hw_cap_path, NULL);
+    zstr_sendx (server, "CONFIG", hw_cap_path, NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
@@ -161,10 +161,10 @@ int main (int argc, char *argv [])
     zloop_destroy (&timer_loop);
     zactor_destroy (&server);
     zactor_destroy (&rc0_runonce);
-    zstr_free(&actor_name);
-    zstr_free(&endpoint);
-    zstr_free(&path);
-    zstr_free(&str_linuxmetrics_interval);
+    zstr_free (&actor_name);
+    zstr_free (&endpoint);
+    zstr_free (&path);
+    zstr_free (&str_linuxmetrics_interval);
     zconfig_destroy (&config);
 
     return 0;
