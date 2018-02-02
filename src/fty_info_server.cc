@@ -37,6 +37,9 @@
 
 #include "fty_info_classes.h"
 
+# define OVA_HW_CAP "ova-capabilities.dsc"
+# define IPC_HW_CAP "ipc-capabilities.dsc"
+
 struct _fty_info_server_t {
     //  Declare class properties here
     char* name;
@@ -401,7 +404,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else if (streq (command, "CONFIG")) {
         self->hw_cap_path = zmsg_popstr (message);
         if (!self->hw_cap_path)
-            zsys_error ("%s hw_cap_path missing", command);
+            zsys_error ("%s: hw_cap_path missing", command);
     }
     else
         zsys_error ("fty-info: Unknown actor command: %s.\n", command);
@@ -423,45 +426,83 @@ void fty_msg_free_fn(void *data)
 //  --------------------------------------------------------------------------
 // return zmsg_t with hw_ capability info or NULL if info cannot be retrieved
 static zmsg_t*
-s_hw_cap (fty_info_server_t *self, const char *type)
+s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
 {
     zmsg_t *msg = zmsg_new ();
-    zconfig_t *cap = zconfig_load (self->hw_cap_path);
+    char *tmp = zsys_sprintf ("%s/%s", self->hw_cap_path, IPC_HW_CAP);
+    zconfig_t *cap = zconfig_load (tmp);
+    zstr_free (&tmp);
+
     if (!cap)
-        return msg;
+    {
+        tmp = zsys_sprintf ("%s/%s", self->hw_cap_path, OVA_HW_CAP);
+        cap = zconfig_load (tmp);
+        zstr_free (&tmp);
+
+        if (!cap)
+            return msg;
+    }
 
     char *path = zsys_sprintf ("hardware/%s/count", type);
     const char *count = s_get (cap, path, "");
+    zstr_free (&path);
 
-
-    if (streq (type, "gpi"))
+    if (streq (count, "0"))
     {
+        zmsg_addstr (msg, zuuid);
+        zmsg_addstr (msg, "OK");
+        zmsg_addstr (msg, type);
         zmsg_addstr (msg, count);
 
-        if (streq (count, "0"))
-        {
-            zconfig_destroy (&cap);
-            zstr_free (&path);
-            return msg;
-        }
-
-
+        zconfig_destroy (&cap);
+        return msg;
     }
-    else
-    if (streq (type, "gpo"))
-    {
 
+    if (streq (type, "gpi") || streq (type, "gpo"))
+    {
+        zmsg_addstr (msg, zuuid);
+        zmsg_addstr (msg, "OK");
+        zmsg_addstr (msg, type);
+        zmsg_addstr (msg, count);
+
+        path = zsys_sprintf ("hardware/%s/base_address", type);
+        const char *ba = s_get (cap, path, "");
+        zstr_free (&path);
+        zmsg_addstr (msg, ba);
+
+        path = zsys_sprintf ("hardware/%s/offset", type);
+        const char *offset = s_get (cap, path, "");
+        zstr_free (&path);
+        zmsg_addstr (msg, offset);
+
+        path = zsys_sprintf ("hardware/%s/mapping", type);
+        zconfig_t *ret = zconfig_locate (cap, path);
+        zstr_free (&path);
+
+        if (ret)
+        {
+            ret = zconfig_child (ret);
+            while (ret != NULL)
+            {
+                zmsg_addstr (msg, zconfig_name (ret));
+                zmsg_addstr (msg, zconfig_value (ret));
+                ret = zconfig_next (ret);
+            }
+            zconfig_destroy (&ret);
+        }
     }
     else
     if (streq (type, "serial"))
     {
-        // not implemented
+        // not implemented yet
     }
     else
     {
-
+        zsys_info ("s_hw_cap: unsuported request for '%s'", type);
+        zmsg_addstr (msg, zuuid);
+        zmsg_addstr (msg, "ERROR");
+        zmsg_addstr (msg, "unsupported type");
     }
-
     zconfig_destroy (&cap);
     return msg;
 }
@@ -529,14 +570,17 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         zmsg_pushstrf (reply, "%s", zuuid);
         ftyinfo_destroy (&info);
     }
-
     else
     if (streq (command, "HW_CAP")) {
-        /* handle hw_cap*/
         const char *type = zmsg_popstr (message);
-        reply = s_hw_cap (self, type);
+        if (type)
+            reply = s_hw_cap (self, type, zuuid);
 
-        zmsg_pushstrf (reply, "%s", zuuid);
+        if (!reply)
+        {
+            zmsg_pushstrf (reply, "%s", zuuid);
+            zmsg_addstr (reply, "ERROR");
+        }
     }
     else {
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
@@ -547,7 +591,12 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         zmsg_addstr (reply, "unexpected command");
     }
 
-    int rv = mlm_client_sendto (self->client, mlm_client_sender (self->client), "info", NULL, 1000, &reply);
+    int rv = mlm_client_sendto (self->client,
+                                mlm_client_sender (self->client),
+                                "info",
+                                NULL,
+                                1000,
+                                &reply);
     if (rv != 0)
         zsys_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
 
@@ -1233,6 +1282,52 @@ fty_info_server_test (bool verbose)
         zhashx_destroy (&metrics);
         zsys_info ("fty-info-test:Test #7: OK");
     }
+    {
+        // TEST #8: hw capability info
+        zsys_info ("fty-info-test:Test #8: starting");
+        zstr_sendx (info_server, "CONFIG", "./src/selftest-ro/data/hw_cap", NULL);
+
+        zmsg_t *hw_req = zmsg_new ();
+        zmsg_addstr (hw_req, "HW_CAP");
+        zmsg_addstr (hw_req, "uuid1234");
+        zmsg_addstr (hw_req, "gpo");
+
+        mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &hw_req);
+
+        zmsg_t *recv = mlm_client_recv (client);
+        assert (recv);
+
+        assert (streq (zmsg_popstr (recv), "uuid1234"));
+        assert (streq (zmsg_popstr (recv), "OK"));
+        assert (streq (zmsg_popstr (recv), "gpo"));
+        assert (streq (zmsg_popstr (recv), "5"));
+        assert (streq (zmsg_popstr (recv), "488"));
+        assert (streq (zmsg_popstr (recv), "20"));
+        assert (streq (zmsg_popstr (recv), "p4"));
+        assert (streq (zmsg_popstr (recv), "502"));
+
+        zmsg_destroy (&recv);
+        zsys_info ("OK\n");
+    }
+    {
+        // TEST #9: hw capability info
+        zmsg_t *hw_req = zmsg_new ();
+        zmsg_addstr (hw_req, "HW_CAP");
+        zmsg_addstr (hw_req, "uuid1234");
+        zmsg_addstr (hw_req, "incorrect type");
+
+        mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &hw_req);
+
+        zmsg_t *recv = mlm_client_recv (client);
+        assert (recv);
+        assert (streq (zmsg_popstr (recv), "uuid1234"));
+        assert (streq (zmsg_popstr (recv), "ERROR"));
+        assert (streq (zmsg_popstr (recv), "unsupported type"));
+
+        zmsg_destroy (&recv);
+        zsys_info ("OK\n");
+    }
+
     mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
     //  @end

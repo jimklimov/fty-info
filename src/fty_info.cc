@@ -58,6 +58,7 @@ int main (int argc, char *argv [])
     char* path = NULL;
     bool verbose = false;
     int argn;
+    const char *hw_cap_path = "/usr/share/fty";
 
     // Parse command line
     for (argn = 1; argn < argc; argn++) {
@@ -136,7 +137,7 @@ int main (int argc, char *argv [])
     }
 
     zstr_sendx (server, "PATH", path, NULL);
-    zstr_sendx (server, "GONFIG", "/usr/share/fty", NULL);
+    zstr_sendx (server, "GONFIG", hw_cap_path, NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
