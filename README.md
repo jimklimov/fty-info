@@ -141,7 +141,7 @@ Request:
 
 where:
 
-* 'type' can be gpi, gpo, serial (not supported yet)
+* 'type' can be GPI, GPO, serial (not supported yet)
 
 Reply:
 
@@ -151,7 +151,7 @@ Reply:
 where:
 'count' - number of GPI/GPO pins
 'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
-'maping' - Mapping between GPI/GPO number and HW pin number
+'mapping' - Mapping between GPI/GPO number and HW pin number
 
 
 ### Stream subscriptions
