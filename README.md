@@ -134,6 +134,26 @@ where
 
     Value associated with ANY key MAY be NULL.
 
+#### HW Capability Request
+Request:
+
+* HW_CAP/'msg-correlation-id'/'type'
+
+where:
+
+* 'type' can be gpi, gpo, serial (not supported yet)
+
+Reply:
+
+* 'msg-correlation-id'/OK/'type'/'count'/'base_address'/'offset'/'mapping1'/'mapping_val1'/'mapping2'/'mapping_val2'/ ...
+* 'msg-correlation-id'/ERROR/'reason'
+
+where:
+'count' - number of GPI/GPO pins
+'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
+'maping' - Mapping between GPI/GPO number and HW pin number
+
+
 ### Stream subscriptions
 
 * Actor info-server is subscribed to ASSETS stream. On receiving such a message, it MUST:
