@@ -576,10 +576,11 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         if (type)
             reply = s_hw_cap (self, type, zuuid);
 
-        if (!reply)
+        if (zmsg_size(reply) == 0)
         {
             zmsg_pushstrf (reply, "%s", zuuid);
             zmsg_addstr (reply, "ERROR");
+            zmsg_addstr (reply, "cap does not exist");
         }
     }
     else {
@@ -1291,6 +1292,7 @@ fty_info_server_test (bool verbose)
         zmsg_addstr (hw_req, "HW_CAP");
         zmsg_addstr (hw_req, "uuid1234");
         zmsg_addstr (hw_req, "gpo");
+        zclock_sleep (1000);
 
         mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &hw_req);
 
@@ -1311,10 +1313,13 @@ fty_info_server_test (bool verbose)
     }
     {
         // TEST #9: hw capability info
+        zsys_info ("fty-info-test:Test #9: starting");
+
         zmsg_t *hw_req = zmsg_new ();
         zmsg_addstr (hw_req, "HW_CAP");
         zmsg_addstr (hw_req, "uuid1234");
         zmsg_addstr (hw_req, "incorrect type");
+        zclock_sleep (1000);
 
         mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &hw_req);
 
