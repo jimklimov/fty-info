@@ -64,6 +64,7 @@ s_get (zconfig_t *config, const char* key, const char*dfl) {
     char *ret = zconfig_get (config, key, dfl);
     if (!ret || streq (ret, ""))
         return dfl;
+
     return ret;
 }
 
@@ -423,7 +424,7 @@ void fty_msg_free_fn(void *data)
 }
 
 //  --------------------------------------------------------------------------
-// return zmsg_t with hw_ capability info or NULL if info cannot be retrieved
+// return zmsg_t with hw capability info or NULL if info cannot be retrieved
 static zmsg_t*
 s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
 {
@@ -481,6 +482,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
             {
                 zmsg_addstr (msg, zconfig_name (ret));
                 zmsg_addstr (msg, zconfig_value (ret));
+
                 ret = zconfig_next (ret);
             }
             zconfig_destroy (&ret);
@@ -499,6 +501,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
         zmsg_addstr (msg, "ERROR");
         zmsg_addstr (msg, "unsupported type");
     }
+
     zconfig_destroy (&cap);
     return msg;
 }
@@ -552,7 +555,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
 
     //we assume all request command are MAILBOX DELIVER, and subject="info"
     if (streq (command, "INFO")) {
-        ftyinfo_t *info= ftyinfo_new (self->resolver,self->path);
+        ftyinfo_t *info = ftyinfo_new (self->resolver,self->path);
 
         reply = s_create_info (info);
         zmsg_pushstrf (reply, "%s", zuuid);
@@ -568,16 +571,17 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     else
     if (streq (command, "HW_CAP")) {
-        const char *type = zmsg_popstr (message);
+        char *type = zmsg_popstr (message);
         if (type)
             reply = s_hw_cap (self, type, zuuid);
 
-        if (zmsg_size(reply) == 0)
+        if (zmsg_size (reply) == 0)
         {
             zmsg_pushstrf (reply, "%s", zuuid);
             zmsg_addstr (reply, "ERROR");
             zmsg_addstr (reply, "cap does not exist");
         }
+        zstr_free (&type);
     }
     else {
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
@@ -1295,14 +1299,30 @@ fty_info_server_test (bool verbose)
         zmsg_t *recv = mlm_client_recv (client);
         assert (recv);
 
-        assert (streq (zmsg_popstr (recv), "uuid1234"));
-        assert (streq (zmsg_popstr (recv), "OK"));
-        assert (streq (zmsg_popstr (recv), "gpo"));
-        assert (streq (zmsg_popstr (recv), "5"));
-        assert (streq (zmsg_popstr (recv), "488"));
-        assert (streq (zmsg_popstr (recv), "20"));
-        assert (streq (zmsg_popstr (recv), "p4"));
-        assert (streq (zmsg_popstr (recv), "502"));
+        char *val = zmsg_popstr (recv);
+        assert (streq (val, "uuid1234"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "OK"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "gpo"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "5"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "488"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "20"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "p4"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "502"));
+        zstr_free (&val);
 
         zmsg_destroy (&recv);
         zsys_info ("OK\n");
@@ -1321,9 +1341,16 @@ fty_info_server_test (bool verbose)
 
         zmsg_t *recv = mlm_client_recv (client);
         assert (recv);
-        assert (streq (zmsg_popstr (recv), "uuid1234"));
-        assert (streq (zmsg_popstr (recv), "ERROR"));
-        assert (streq (zmsg_popstr (recv), "unsupported type"));
+
+        char *val = zmsg_popstr (recv);
+        assert (streq (val, "uuid1234"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "ERROR"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "unsupported type"));
+        zstr_free (&val);
 
         zmsg_destroy (&recv);
         zsys_info ("OK\n");
@@ -1332,8 +1359,9 @@ fty_info_server_test (bool verbose)
     mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
     //  @end
-    zactor_destroy (&info_server);
+
     mlm_client_destroy (&client);
+    zactor_destroy (&info_server);
     zactor_destroy (&server);
     zsys_info ("OK\n");
 }
