@@ -440,7 +440,10 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
         zstr_free (&tmp);
 
         if (!cap)
+        {
+            zsys_debug ("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
             return msg;
+        }
     }
 
     char *path = zsys_sprintf ("hardware/%s/count", type);
