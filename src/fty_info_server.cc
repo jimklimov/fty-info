@@ -37,8 +37,7 @@
 
 #include "fty_info_classes.h"
 
-# define OVA_HW_CAP "ova-capabilities.dsc"
-# define IPC_HW_CAP "ipc-capabilities.dsc"
+#define HW_CAP_FILE "42ity-capabilities.dsc"
 
 struct _fty_info_server_t {
     //  Declare class properties here
@@ -429,21 +428,14 @@ static zmsg_t*
 s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
 {
     zmsg_t *msg = zmsg_new ();
-    char *tmp = zsys_sprintf ("%s/%s", self->hw_cap_path, IPC_HW_CAP);
+    char *tmp = zsys_sprintf ("%s/%s", self->hw_cap_path, HW_CAP_FILE);
     zconfig_t *cap = zconfig_load (tmp);
     zstr_free (&tmp);
 
     if (!cap)
     {
-        tmp = zsys_sprintf ("%s/%s", self->hw_cap_path, OVA_HW_CAP);
-        cap = zconfig_load (tmp);
-        zstr_free (&tmp);
-
-        if (!cap)
-        {
-            zsys_debug ("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
-            return msg;
-        }
+        zsys_debug ("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
+        return msg;
     }
 
     char *path = zsys_sprintf ("hardware/%s/count", type);
@@ -502,6 +494,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
     else
     {
         zsys_info ("s_hw_cap: unsuported request for '%s'", type);
+
         zmsg_addstr (msg, zuuid);
         zmsg_addstr (msg, "ERROR");
         zmsg_addstr (msg, "unsupported type");
