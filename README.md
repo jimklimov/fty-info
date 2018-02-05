@@ -141,7 +141,7 @@ where
 
 where:
 
-* 'type' can be GPI, GPO, serial (not supported yet)
+* 'type' can be gpi, gpo, serial (not supported yet)
 
 Response of FTY_INFO:
 
@@ -149,9 +149,10 @@ Response of FTY_INFO:
 * 'msg-correlation-id'/ERROR/'reason'
 
 where:
-'count' - number of GPI/GPO pins
-'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
-'mapping' - Mapping between GPI/GPO number and HW pin number
+
+* 'count' - number of GPI/GPO pins
+* 'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
+* 'mapping' - Mapping between GPI/GPO number and HW pin number
 
 
 ### Stream subscriptions
