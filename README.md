@@ -81,6 +81,7 @@ Agent doesn't publish any alerts.
 It is possible to request the fty-info agent for:
 
 * RC information
+* HW Capability
 
 #### RC information
 
@@ -133,6 +134,26 @@ where
     * "ip.3"
 
     Value associated with ANY key MAY be NULL.
+
+#### HW Capability Request
+
+* HW_CAP/'msg-correlation-id'/'type'
+
+where:
+
+* 'type' can be gpi, gpo, serial (not supported yet)
+
+Response of FTY_INFO:
+
+* 'msg-correlation-id'/OK/'type'/'count'/'base_address'/'offset'/'mapping1'/'mapping_val1'/'mapping2'/'mapping_val2'/ ...
+* 'msg-correlation-id'/ERROR/'reason'
+
+where:
+
+* 'count' - number of GPI/GPO pins
+* 'offset' - offset of pin numbering (GPI pins have -1 offset, i.e. GPI 1 is pin 0, ... )
+* 'mapping' - Mapping between GPI/GPO number and HW pin number
+
 
 ### Stream subscriptions
 
