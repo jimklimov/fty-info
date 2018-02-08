@@ -1134,7 +1134,7 @@ fty_info_server_test (bool verbose)
 
         std::string root_dir = str_SELFTEST_DIR_RO + "/data/";
         zstr_sendx (info_server, "ROOT_DIR", root_dir.c_str (), NULL);
-        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "0", NULL);
+        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "30", NULL);
         zstr_sendx (info_server, "PRODUCER", "METRICS-TEST", NULL);
         zclock_sleep (1000);
 
@@ -1237,7 +1237,7 @@ fty_info_server_test (bool verbose)
                 char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
                 assert (zhashx_lookup (metrics, rx_bandwidth));
                 metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bandwidth);
-                assert (0 == atoi (fty_proto_value (metric)));
+                assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&rx_bandwidth);
 
                 char *rx_bytes = zsys_sprintf (BYTES_TEMPLATE, "rx", iface);
@@ -1258,7 +1258,7 @@ fty_info_server_test (bool verbose)
                 char *tx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "tx", iface);
                 assert (zhashx_lookup (metrics, tx_bandwidth));
                 metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bandwidth);
-                assert (0 == atoi (fty_proto_value (metric)));
+                assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&tx_bandwidth);
 
                 char *tx_bytes = zsys_sprintf (BYTES_TEMPLATE, "tx", iface);
