@@ -213,7 +213,16 @@ s_meminfo (std::string &root_dir)
 
     std::string line_free = s_getline_by_name (root_dir + "proc/meminfo", "MemFree:");
     double memory_free = s_get_field (line_free, 2);
-    double memory_used = memory_total - memory_free;
+    std::string line_buffers = s_getline_by_name (root_dir + "proc/meminfo", "Buffers:");
+    double memory_buffers = s_get_field (line_buffers, 2);
+    std::string line_cached = s_getline_by_name (root_dir + "proc/meminfo", "Cached:");
+    double memory_cached = s_get_field (line_cached, 2);
+    std::string line_reclaim = s_getline_by_name (root_dir + "proc/meminfo", "SReclaimable:");
+    double memory_reclaim = s_get_field (line_reclaim, 2);
+    std::string line_shmem = s_getline_by_name (root_dir + "proc/meminfo", "Shmem:");
+    double memory_shmem = s_get_field (line_shmem, 2);
+
+    double memory_used = memory_total - memory_free - (memory_buffers + memory_cached + memory_reclaim - memory_shmem);
 
     linuxmetric_t *memory_used_info = linuxmetric_new ();
     memory_used_info->type = strdup (LINUXMETRIC_MEMORY_USED);

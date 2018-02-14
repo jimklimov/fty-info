@@ -1198,11 +1198,11 @@ fty_info_server_test (bool verbose)
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USED));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USED);
-        assert (2048 == atoi (fty_proto_value (metric)));
+        assert (1024 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USAGE));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE);
-        assert (50 == atoi (fty_proto_value (metric)));
+        assert (25 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_TOTAL));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_TOTAL);
