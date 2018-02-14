@@ -1204,28 +1204,28 @@ fty_info_server_test (bool verbose)
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE);
         assert (50 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_TOTAL);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_TOTAL);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USED);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USED);
         assert (1 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USAGE);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USAGE);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_TOTAL);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_TOTAL);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USED);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USED);
         assert (5 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USAGE);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USAGE);
         assert (50 == atoi (fty_proto_value (metric)));
 
         state = (const char *) zhashx_first (interfaces);
