@@ -288,18 +288,17 @@ s_flash_info (std::string &root_dir)
     flash_total_info->unit = "MB";
     zlistx_add_end (flash_info, flash_total_info);
 
-    double flash_used = flash_total - buf.f_bsize * buf.f_bfree;
+    //df -h computes "/" usage from f_bavail, let's do the same
+    double flash_used = flash_total - buf.f_bsize * buf.f_bavail;
     linuxmetric_t *flash_used_info = linuxmetric_new ();
     flash_used_info->type = strdup (LINUXMETRIC_SYSTEM_USED);
     flash_used_info->value = s_round (flash_used / to_MB);
     flash_used_info->unit = "MB";
     zlistx_add_end (flash_info, flash_used_info);
 
-    //df -h computes "/" usage from f_bavail, let's do the same
-    double flash_used_nonroot = flash_total - buf.f_bsize * buf.f_bavail;
     linuxmetric_t *flash_usage_info = linuxmetric_new ();
     flash_usage_info->type = strdup (LINUXMETRIC_SYSTEM_USAGE);
-    flash_usage_info->value = s_round (100 * (flash_used_nonroot / flash_total));
+    flash_usage_info->value = s_round (100 * (flash_used / flash_total));
     flash_usage_info->unit = "%";
     zlistx_add_end (flash_info, flash_usage_info);
 
