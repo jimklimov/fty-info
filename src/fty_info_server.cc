@@ -1134,7 +1134,7 @@ fty_info_server_test (bool verbose)
 
         std::string root_dir = str_SELFTEST_DIR_RO + "/data/";
         zstr_sendx (info_server, "ROOT_DIR", root_dir.c_str (), NULL);
-        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "0", NULL);
+        zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "30", NULL);
         zstr_sendx (info_server, "PRODUCER", "METRICS-TEST", NULL);
         zclock_sleep (1000);
 
@@ -1198,34 +1198,34 @@ fty_info_server_test (bool verbose)
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USED));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USED);
-        assert (2048 == atoi (fty_proto_value (metric)));
+        assert (1024 == atoi (fty_proto_value (metric)));
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_MEMORY_USAGE));
         metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_MEMORY_USAGE);
-        assert (50 == atoi (fty_proto_value (metric)));
+        assert (25 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_TOTAL);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_TOTAL);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USED);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USED);
         assert (1 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_SDCARD_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SDCARD_USAGE);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_DATA0_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_DATA0_USAGE);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_TOTAL));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_TOTAL);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_TOTAL));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_TOTAL);
         assert (10 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USED));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USED);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USED));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USED);
         assert (5 == atoi (fty_proto_value (metric)));
 
-        assert (zhashx_lookup (metrics, LINUXMETRIC_FLASH_USAGE));
-        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_FLASH_USAGE);
+        assert (zhashx_lookup (metrics, LINUXMETRIC_SYSTEM_USAGE));
+        metric = (fty_proto_t *) zhashx_lookup (metrics,LINUXMETRIC_SYSTEM_USAGE);
         assert (50 == atoi (fty_proto_value (metric)));
 
         state = (const char *) zhashx_first (interfaces);
@@ -1237,7 +1237,7 @@ fty_info_server_test (bool verbose)
                 char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
                 assert (zhashx_lookup (metrics, rx_bandwidth));
                 metric = (fty_proto_t *) zhashx_lookup (metrics, rx_bandwidth);
-                assert (0 == atoi (fty_proto_value (metric)));
+                assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&rx_bandwidth);
 
                 char *rx_bytes = zsys_sprintf (BYTES_TEMPLATE, "rx", iface);
@@ -1258,7 +1258,7 @@ fty_info_server_test (bool verbose)
                 char *tx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "tx", iface);
                 assert (zhashx_lookup (metrics, tx_bandwidth));
                 metric = (fty_proto_t *) zhashx_lookup (metrics, tx_bandwidth);
-                assert (0 == atoi (fty_proto_value (metric)));
+                assert (33333 == atoi (fty_proto_value (metric)));
                 zstr_free (&tx_bandwidth);
 
                 char *tx_bytes = zsys_sprintf (BYTES_TEMPLATE, "tx", iface);

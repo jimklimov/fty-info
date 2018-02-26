@@ -1,3 +1,7 @@
 MemTotal:        4096 kB
 MemFree:         2048 kB
+Buffers:          512 kB
+Cached:           512 kB
+SReclaimable:       0 kB
+Shmem:              0 kB
 
