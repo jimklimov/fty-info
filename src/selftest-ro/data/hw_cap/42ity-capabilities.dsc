@@ -1,4 +1,5 @@
 hardware
+    type              = ipc
     gpi
         base_address  = 488     #   Target address of the GPIO chipset (gpiochip488 on IPC3000)
         count         = 10      #   Number of GPI (on IPC3000)
