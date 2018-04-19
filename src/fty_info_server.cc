@@ -439,27 +439,18 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
         return msg;
     }
 
-    char *path = zsys_sprintf ("hardware/%s/count", type);
-    const char *count = s_get (cap, path, "");
-    zstr_free (&path);
-
-    if (streq (count, "0"))
-    {
-        zmsg_addstr (msg, zuuid);
-        zmsg_addstr (msg, "OK");
-        zmsg_addstr (msg, type);
-        zmsg_addstr (msg, count);
-
-        zconfig_destroy (&cap);
-        return msg;
-    }
-
     if (streq (type, "gpi") || streq (type, "gpo"))
     {
+        char *path = zsys_sprintf ("hardware/%s/count", type);
+        const char *count = s_get (cap, path, "");
+        zstr_free (&path);
+
         zmsg_addstr (msg, zuuid);
         zmsg_addstr (msg, "OK");
         zmsg_addstr (msg, type);
         zmsg_addstr (msg, count);
+        if (streq (count, "0"))
+            goto out;
 
         path = zsys_sprintf ("hardware/%s/base_address", type);
         const char *ba = s_get (cap, path, "");
@@ -494,6 +485,14 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
         // not implemented yet
     }
     else
+    if (streq (type, "type"))
+    {
+        zmsg_addstr (msg, zuuid);
+        zmsg_addstr (msg, "OK");
+        zmsg_addstr (msg, type);
+        zmsg_addstr (msg, s_get (cap, "hardware/type", ""));
+    }
+    else
     {
         zsys_info ("s_hw_cap: unsuported request for '%s'", type);
 
@@ -502,6 +501,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
         zmsg_addstr (msg, "unsupported type");
     }
 
+out:
     zconfig_destroy (&cap);
     return msg;
 }
@@ -1355,6 +1355,37 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zsys_info ("OK\n");
     }
+    {
+        // TEST #10: hw capability: type
+        zsys_info ("fty-info-test:Test #10: hardware/type");
+        zmsg_t *hw_req = zmsg_new ();
+        zmsg_addstr (hw_req, "HW_CAP");
+        zmsg_addstr (hw_req, "uuid1235");
+        zmsg_addstr (hw_req, "type");
+
+        mlm_client_sendto (client, "fty-info", "info", NULL, 1000, &hw_req);
+
+        zmsg_t *recv = mlm_client_recv (client);
+        assert (recv);
+
+        char *val = zmsg_popstr (recv);
+        assert (streq (val, "uuid1235"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "OK"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "type"));
+        zstr_free (&val);
+        val = zmsg_popstr (recv);
+        assert (streq (val, "ipc"));
+        zstr_free (&val);
+        assert (zmsg_popstr (recv) == NULL);
+
+        zmsg_destroy (&recv);
+        zsys_info ("OK\n");
+    }
+
 
     mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
