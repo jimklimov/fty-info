@@ -585,6 +585,8 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     else {
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
+
+        reply = zmsg_new ();
         if (NULL != zuuid)
             zmsg_addstr (reply, zuuid);
 
