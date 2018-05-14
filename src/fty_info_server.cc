@@ -552,8 +552,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     char *zuuid = zmsg_popstr (message);
     zmsg_t *reply = NULL;
 
-
-    //we assume all request command are MAILBOX DELIVER, and subject="info"
+    //we assume all request command are MAILBOX DELIVER, and with any subject"
     if (streq (command, "INFO")) {
         ftyinfo_t *info = ftyinfo_new (self->resolver,self->path);
 
@@ -585,6 +584,8 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     }
     else {
         zsys_warning ("fty-info: Received unexpected command '%s'", command);
+
+        reply = zmsg_new ();
         if (NULL != zuuid)
             zmsg_addstr (reply, zuuid);
 
