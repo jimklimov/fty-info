@@ -238,7 +238,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     if (0 != change) {
         fty_proto_t *messageDup = fty_proto_dup(message);
         zmsg_t *msgDup = fty_proto_encode(&messageDup);
-        zmsg_pushstrf (msgDup, "%s", "READWRITE");
+        zmsg_pushstrf (msgDup, "%s", "READONLY");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
             zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
