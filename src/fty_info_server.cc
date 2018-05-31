@@ -582,8 +582,13 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         }
         zstr_free (&type);
     }
+    else
+    if (streq (command, "ERROR")) {
+        // Don't reply to ERROR messages
+        zsys_warning ("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender (self->client));
+    }
     else {
-        zsys_warning ("fty-info: Received unexpected command '%s'", command);
+        zsys_warning ("%s: Received unexpected command '%s'", self->name, command);
 
         reply = zmsg_new ();
         if (NULL != zuuid)
@@ -593,14 +598,16 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
         zmsg_addstr (reply, "unexpected command");
     }
 
-    int rv = mlm_client_sendto (self->client,
-                                mlm_client_sender (self->client),
-                                "info",
-                                NULL,
-                                1000,
-                                &reply);
-    if (rv != 0)
-        zsys_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
+    if (reply) {
+        int rv = mlm_client_sendto (self->client,
+                                    mlm_client_sender (self->client),
+                                    "info",
+                                    NULL,
+                                    1000,
+                                    &reply);
+        if (rv != 0)
+            zsys_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
+    }
 
     zstr_free (&zuuid);
     zstr_free (&command);
