@@ -64,11 +64,12 @@
 #   define FTY_INFO_EXPORT
 #   define FTY_INFO_PRIVATE
 #else
-#   define FTY_INFO_EXPORT
 #   if (defined __GNUC__ && __GNUC__ >= 4) || defined __INTEL_COMPILER
 #       define FTY_INFO_PRIVATE __attribute__ ((visibility ("hidden")))
+#       define FTY_INFO_EXPORT __attribute__ ((visibility ("default")))
 #   else
 #       define FTY_INFO_PRIVATE
+#       define FTY_INFO_EXPORT
 #   endif
 #endif
 
@@ -94,9 +95,18 @@ typedef struct _fty_info_server_t fty_info_server_t;
 #endif // FTY_INFO_BUILD_DRAFT_API
 
 #ifdef FTY_INFO_BUILD_DRAFT_API
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //  Self test for private classes
 FTY_INFO_EXPORT void
-    fty_info_private_selftest (bool verbose);
+    fty_info_private_selftest (bool verbose, const char *subtest);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // FTY_INFO_BUILD_DRAFT_API
 
 #endif
