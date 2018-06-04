@@ -65,16 +65,11 @@ FTY_INFO_PRIVATE void
 //  *** Draft method, defined for internal use only ***
 //  Self test of this class.
 FTY_INFO_PRIVATE void
-    ftyinfo_test (bool verbose);
-
-//  *** Draft method, defined for internal use only ***
-//  Self test of this class.
-FTY_INFO_PRIVATE void
     fty_info_rc0_runonce_test (bool verbose);
 
 //  Self test for private classes
 FTY_INFO_PRIVATE void
-    fty_info_private_selftest (bool verbose);
+    fty_info_private_selftest (bool verbose, const char *subtest);
 
 #endif // FTY_INFO_BUILD_DRAFT_API
 

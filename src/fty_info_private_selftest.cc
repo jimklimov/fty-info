@@ -35,11 +35,13 @@
 //
 
 void
-fty_info_private_selftest (bool verbose)
+fty_info_private_selftest (bool verbose, const char *subtest)
 {
 // Tests for stable private classes:
-    topologyresolver_test (verbose);
-    fty_info_rc0_runonce_test (verbose);
+    if (streq (subtest, "$ALL") || streq (subtest, "topologyresolver_test"))
+        topologyresolver_test (verbose);
+    if (streq (subtest, "$ALL") || streq (subtest, "fty_info_rc0_runonce_test"))
+        fty_info_rc0_runonce_test (verbose);
 }
 /*
 ################################################################################
