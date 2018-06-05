@@ -1,6 +1,7 @@
 # Travis CI script
 # This is a skeleton created by zproject.
 # You can add hand-written code here.
+### Note: Customized after generation; take care upon regens
 
 language:
 - cpp
@@ -22,8 +23,9 @@ sudo: false
 #dist:
 #- trusty
 
-#services:
-#- docker
+# Note: was uncommented in earlier builds (TODO: Check if needed)
+services:
+- docker
 
 # Set CI_TIME=true to enable build-step profiling in Travis
 # Set CI_TRACE=true to enable shell script tracing in Travis
@@ -50,17 +52,28 @@ env:
   matrix:
     - BUILD_TYPE=default
     - BUILD_TYPE=default-Werror
-#    - BUILD_TYPE=cmake
+### Note: we don't use CMake
+#   - BUILD_TYPE=cmake
 #   - BUILD_TYPE=android
 #   - BUILD_TYPE=check-py
 
-pkg_deps_prereqs: &pkg_deps_prereqs
+# Prerequisite packages provided by OS distro and used "as is"
+pkg_deps_prereqs_distro: &pkg_deps_prereqs_distro
+
+# Prerequisite packages that may be built from source or used from
+# prebuilt packages of that source (usually not from an OS distro)
+pkg_deps_prereqs_source: &pkg_deps_prereqs_source
     - libsodium-dev
-#    - libzmq3-dev
-#    - libczmq-dev
-#    - libmlm-dev
-#    - libfty-proto-dev
-#    - cxxtools-dev
+    - libzmq3-dev
+    - libczmq-dev
+    - libmlm-dev
+    - libfty-proto-dev
+    - cxxtools-dev
+
+# NOTE: Our forks are checked out and built without pkg dependencies in use
+pkg_deps_prereqs: &pkg_deps_prereqs
+#    - *pkg_deps_prereqs_source
+    - *pkg_deps_prereqs_distro
 
 pkg_deps_doctools: &pkg_deps_doctools
     - asciidoc
@@ -91,6 +104,8 @@ matrix:
   include:
   - env: BUILD_TYPE=default-with-docs
     os: linux
+# Note: was uncommented in earlier builds (TODO: Check if needed)
+#    services: docker
     addons:
       apt:
         sources: *pkg_src_zeromq_ubuntu14
@@ -114,9 +129,12 @@ matrix:
         sources: *pkg_src_zeromq_ubuntu14
         packages:
         - *pkg_deps_common
+### Note: we don't use CMake
 #  - env: BUILD_TYPE=cmake DO_CLANG_FORMAT_CHECK=1 CLANG_FORMAT=clang-format-5.0
 # For non-cmake users, there is an autotools solution with a bit more overhead
-# to have dependencies ready and pass configure script before making this check):
+# to have dependencies ready and pass configure script before making this check).
+# Note that the autotools variant will also require dependencies preinstalled to
+# pass its configure script:
   - env: BUILD_TYPE=clang-format-check CLANG_FORMAT=clang-format-5.0
     os: linux
     dist: trusty
@@ -127,6 +145,7 @@ matrix:
         packages:
         - clang-5.0
         - clang-format-5.0
+        - *pkg_deps_prereqs
 
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "osx" -a "$BUILD_TYPE" == "android" ] ; then brew install binutils ; fi
