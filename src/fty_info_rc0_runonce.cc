@@ -127,41 +127,49 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
 
     // just for rackcontroller-0
-    int change = 0;
+    int changeRW = 0;
+    int changeRO = 0;
+
+    fty_proto_t *messageRO = fty_proto_dup(message);
+    zhash_t *ext = zhash_new ();
+    zhash_autofree (ext);
+    fty_proto_set_ext (messageRO, &ext);
+    fty_proto_t *messageRW = fty_proto_dup(messageRO);
 
     const char *data = fty_proto_ext_string(message, "uuid", NULL);
     if (NULL == data) {
         if (NULL != self->info->uuid) {
-            fty_proto_ext_insert(message, "uuid", "%s", self->info->uuid);
-            change = 1;
+            fty_proto_ext_insert(messageRO, "uuid", "%s", self->info->uuid);
+            changeRO = 1;
         }
     }
     data = fty_proto_name(message);
     if ((NULL == data) || (0 == strcmp("", data))) {
         if (NULL != self->info->product) {
-            fty_proto_set_name(message, "%s", self->info->product);
-            change = 1;
+            fty_proto_set_name(messageRO, "%s", self->info->product);
+            fty_proto_set_name(messageRW, "%s", self->info->product);
+            changeRO = 1;
         }
     }
     data = fty_proto_ext_string(message, "manufacturer", NULL);
     if (NULL == data) {
         if (NULL != self->info->manufacturer) {
-            fty_proto_ext_insert(message, "manufacturer", "%s", self->info->manufacturer);
-            change = 1;
+            fty_proto_ext_insert(messageRO, "manufacturer", "%s", self->info->manufacturer);
+            changeRO = 1;
         }
     }
     data = fty_proto_ext_string(message, "serial_no", NULL);
     if (NULL == data) {
         if (NULL != self->info->serial) {
-            fty_proto_ext_insert(message, "serial_no", "%s", self->info->serial);
-            change = 1;
+            fty_proto_ext_insert(messageRO, "serial_no", "%s", self->info->serial);
+            changeRO = 1;
         }
     }
     data = fty_proto_ext_string(message, "contact_name", NULL);
     if (NULL == data) {
         if (NULL != self->info->contact) {
-            fty_proto_ext_insert(message, "contact_name", "%s", self->info->contact);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "contact_name", "%s", self->info->contact);
+            changeRW = 1;
         }
     }
     data = fty_proto_ext_string(message, "description", NULL);
@@ -169,36 +177,36 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
         if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
                 && (NULL != self->info->description && 0 != strcmp("", self->info->description))
                 && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
-            fty_proto_ext_insert(message, "description", "%s %s %s",
+            fty_proto_ext_insert(messageRW, "description", "%s %s %s",
                     self->info->hostname, self->info->description, self->info->installDate);
-            change = 1;
+            changeRW = 1;
         }
         else if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
                 && (NULL != self->info->description && 0 != strcmp("", self->info->description))) {
-            fty_proto_ext_insert(message, "description", "%s %s", self->info->hostname, self->info->description);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s %s", self->info->hostname, self->info->description);
+            changeRW = 1;
         }
         else if ((NULL != self->info->hostname && 0 != strcmp("", self->info->hostname))
                 && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
-            fty_proto_ext_insert(message, "description", "%s %s", self->info->hostname, self->info->installDate);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s %s", self->info->hostname, self->info->installDate);
+            changeRW = 1;
         }
         else if ((NULL != self->info->description && 0 != strcmp("", self->info->description))
                 && (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate))) {
-            fty_proto_ext_insert(message, "description", "%s %s", self->info->description, self->info->installDate);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s %s", self->info->description, self->info->installDate);
+            changeRW = 1;
         }
         else if (NULL != self->info->hostname && 0 != strcmp("", self->info->hostname)) {
-            fty_proto_ext_insert(message, "description", "%s", self->info->hostname);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s", self->info->hostname);
+            changeRW = 1;
         }
         else if (NULL != self->info->description && 0 != strcmp("", self->info->description)) {
-            fty_proto_ext_insert(message, "description", "%s", self->info->description);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s", self->info->description);
+            changeRW = 1;
         }
         else if (NULL != self->info->installDate && 0 != strcmp("", self->info->installDate)) {
-            fty_proto_ext_insert(message, "description", "%s", self->info->installDate);
-            change = 1;
+            fty_proto_ext_insert(messageRW, "description", "%s", self->info->installDate);
+            changeRW = 1;
         }
     }
 
@@ -216,15 +224,16 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
                                 host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST) == 0) {
                     switch(counter) {
                         case 0:
-                            fty_proto_ext_insert(message, "ip.1", "%s", host);
+                            fty_proto_ext_insert(messageRO, "ip.1", "%s", host);
                             break;
                         case 1:
-                            fty_proto_ext_insert(message, "ip.2", "%s", host);
+                            fty_proto_ext_insert(messageRO, "ip.2", "%s", host);
                             break;
                         case 2:
-                            fty_proto_ext_insert(message, "ip.3", "%s", host);
+                            fty_proto_ext_insert(messageRO, "ip.3", "%s", host);
                             break;
                     }
+                    changeRO = 1;
                     ++counter;
                 }
                 if (counter == 3) {
@@ -235,19 +244,36 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
         }
     }
 
-    if (0 != change) {
-        fty_proto_t *messageDup = fty_proto_dup(message);
+    if (0 != changeRO) {
+        fty_proto_t *messageDup = fty_proto_dup(messageRO);
         zmsg_t *msgDup = fty_proto_encode(&messageDup);
         zmsg_pushstrf (msgDup, "%s", "READONLY");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
             zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
             fty_proto_destroy (&message);
+            fty_proto_destroy (&messageRO);
+            fty_proto_destroy (&messageRW);
+            return -1;
+        }
+    }
+    if(changeRW != 0) {
+        fty_proto_t *messageDup = fty_proto_dup(messageRW);
+        zmsg_t *msgDup = fty_proto_encode(&messageDup);
+        zmsg_pushstrf (msgDup, "%s", "READWRITE");
+        int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
+        if (rv == -1) {
+            zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
+            fty_proto_destroy (&message);
+            fty_proto_destroy (&messageRO);
+            fty_proto_destroy (&messageRW);
             return -1;
         }
     }
 
     fty_proto_destroy (&message);
+    fty_proto_destroy (&messageRO);
+    fty_proto_destroy (&messageRW);
     return 1;
 }
 
