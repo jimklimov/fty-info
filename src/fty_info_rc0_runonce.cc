@@ -33,7 +33,6 @@
 struct _fty_info_rc0_runonce_t {
     char *name;
     char *endpoint;
-    bool verbose;
     topologyresolver_t *resolver;
     ftyinfo_t *info;
     mlm_client_t *client;
@@ -51,7 +50,6 @@ fty_info_rc0_runonce_new (char *name)
     //  Initialize class properties here
     self->name=strdup(name);
     self->client = mlm_client_new ();
-    self->verbose=false;
     self->resolver = topologyresolver_new (DEFAULT_RC_INAME);
     self->info = ftyinfo_new (self->resolver, DEFAULT_PATH);
     return self;
@@ -95,18 +93,18 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     }
     fty_proto_t *message = fty_proto_decode (&msg);
     if (NULL == message ) {
-        zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
+        log_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
         return -1;
     }
     if (fty_proto_id (message) != FTY_PROTO_ASSET) {
-        zsys_debug("Not FTY_PROTO_ASSET");
+        log_debug("Not FTY_PROTO_ASSET");
         fty_proto_destroy (&message);
         return 0;
     }
 
     const char *operation = fty_proto_operation (message);
     if (operation && !streq (operation, FTY_PROTO_ASSET_OP_UPDATE)) {
-        zsys_debug("Not FTY_PROTO_ASSET_OP_UPDATE");
+        log_debug("Not FTY_PROTO_ASSET_OP_UPDATE");
         fty_proto_destroy (&message);
         return 0;
     }
@@ -114,14 +112,14 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
     const char *type = fty_proto_aux_string (message, "type", "");
     const char *subtype = fty_proto_aux_string (message, "subtype", "");
     if (!streq (type, "device") || !streq (subtype, "rackcontroller")) {
-        zsys_debug ("Not device.rackcontroller");
+        log_debug ("Not device.rackcontroller");
         fty_proto_destroy (&message);
         return 0;
     }
 
     const char *iname = fty_proto_name(message);
     if (NULL == iname || !streq(iname, DEFAULT_RC_INAME)) {
-        zsys_debug("Not %s", DEFAULT_RC_INAME);
+        log_debug("Not %s", DEFAULT_RC_INAME);
         fty_proto_destroy (&message);
         return 0;
     }
@@ -250,7 +248,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
         zmsg_pushstrf (msgDup, "%s", "READONLY");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
-            zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
+            log_error("Failed to send ASSET_MANIPULATION message to asset-agent");
             fty_proto_destroy (&message);
             fty_proto_destroy (&messageRO);
             fty_proto_destroy (&messageRW);
@@ -263,7 +261,7 @@ handle_stream(fty_info_rc0_runonce_t *self, zmsg_t *msg)
         zmsg_pushstrf (msgDup, "%s", "READWRITE");
         int rv = mlm_client_sendto(self->client, "asset-agent", "ASSET_MANIPULATION", NULL, 10, &msgDup);
         if (rv == -1) {
-            zsys_error("Failed to send ASSET_MANIPULATION message to asset-agent");
+            log_error("Failed to send ASSET_MANIPULATION message to asset-agent");
             fty_proto_destroy (&message);
             fty_proto_destroy (&messageRO);
             fty_proto_destroy (&messageRW);
@@ -290,11 +288,11 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
     char *command = zmsg_popstr (message);
     if (!command) {
         zmsg_destroy (&message);
-        zsys_warning ("Empty command.");
+        log_warning ("Empty command.");
         return 0;
     }
     if (streq(command, "$TERM")) {
-        zsys_info ("Got $TERM");
+        log_info ("Got $TERM");
         zmsg_destroy (&message);
         zstr_free (&command);
         return 1;
@@ -305,18 +303,13 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
 
         if (endpoint) {
             self->endpoint = strdup(endpoint);
-            zsys_debug ("fty-info-rc0-runonce: CONNECT: %s/%s", self->endpoint, self->name);
+            log_debug ("fty-info-rc0-runonce: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
-                zsys_error("mlm_client_connect failed\n");
+                log_error("mlm_client_connect failed\n");
 
         }
         zstr_free (&endpoint);
-    }
-    else
-    if (streq (command, "VERBOSE")) {
-        self->verbose = true;
-        zsys_debug ("fty-info-rc0-runonce: VERBOSE=true");
     }
     else
     if (streq (command, "CONSUMER")) {
@@ -324,13 +317,13 @@ handle_pipe(fty_info_rc0_runonce_t *self, zmsg_t *message)
         char* pattern = zmsg_popstr (message);
         int rv = mlm_client_set_consumer (self->client, stream, pattern);
         if (rv == -1)
-            zsys_error ("%s: can't set consumer on stream '%s', '%s'",
+            log_error ("%s: can't set consumer on stream '%s', '%s'",
                     self->name, stream, pattern);
         zstr_free (&pattern);
         zstr_free (&stream);
     }
     else
-        zsys_error ("fty-info-rc0-runonce: Unknown actor command: %s.\n", command);
+        log_error ("fty-info-rc0-runonce: Unknown actor command: %s.\n", command);
 
     zstr_free (&command);
     zmsg_destroy (&message);
@@ -345,7 +338,7 @@ void fty_info_rc0_runonce (zsock_t *pipe, void *args)
 {
     char *name = (char *)args;
     if (!name) {
-        zsys_error ("Address for fty-info-rc0-runonce actor is NULL");
+        log_error ("Address for fty-info-rc0-runonce actor is NULL");
         return;
     }
     fty_info_rc0_runonce_t *self = fty_info_rc0_runonce_new (name);
@@ -354,7 +347,7 @@ void fty_info_rc0_runonce (zsock_t *pipe, void *args)
     assert (poller);
 
     zsock_signal (pipe, 0);
-    zsys_info ("fty-info-rc0-runonce: Started");
+    log_info ("fty-info-rc0-runonce: Started");
 
     while (!zsys_interrupted)
     {
@@ -365,10 +358,9 @@ void fty_info_rc0_runonce (zsock_t *pipe, void *args)
             }
         }
         if (which == pipe) {
-            if (self->verbose)
-                zsys_debug ("which == pipe");
+            log_debug ("which == pipe");
             if (0 != handle_pipe(self, zmsg_recv (pipe))) {
-                zsys_debug("Broken pipe message");
+                log_debug("Broken pipe message");
                 break;
             }
             else continue;
@@ -382,11 +374,11 @@ void fty_info_rc0_runonce (zsock_t *pipe, void *args)
             if (streq (command, "STREAM DELIVER")) {
                 int rv = handle_stream (self, message);
                 if (0 > rv) {
-                    zsys_debug("Broken stream message");
+                    log_debug("Broken stream message");
                     break;
                 }
                 if (1 == rv) {
-                    zsys_debug("RC-0 updated, finishing");
+                    log_debug("RC-0 updated, finishing");
                     break;
                 }
             }

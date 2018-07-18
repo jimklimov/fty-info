@@ -29,6 +29,7 @@
 #include "fty_info_classes.h"
 
 #define RC0_RUNONCE_ACTOR "fty-info-rc0-runonce"
+#define DEFAULT_LOG_CONFIG "/etc/fty/ftylog.cfg"
 
 static int
 s_linuxmetrics_event (zloop_t *loop, int timer_id, void *output)
@@ -59,6 +60,9 @@ int main (int argc, char *argv [])
     bool verbose = false;
     int argn;
     const char *hw_cap_path = "/usr/share/fty";
+
+    ManageFtyLog::setInstanceFtylog (FTY_INFO_AGENT);
+    std::string log_config_path;
 
     // Parse command line
     for (argn = 1; argn < argc; argn++) {
@@ -92,10 +96,10 @@ int main (int argc, char *argv [])
 
     // Parse config file
     if(config_file) {
-        my_zsys_debug (verbose, "fty_info: loading configuration file '%s'", config_file);
+        log_debug ("fty_info: loading configuration file '%s'", config_file);
         config = zconfig_load (config_file);
         if (!config) {
-            zsys_error ("Failed to load config file %s: %m", config_file);
+            log_error ("Failed to load config file %s: %m", config_file);
             exit (EXIT_FAILURE);
         }
         // VERBOSE
@@ -113,7 +117,15 @@ int main (int argc, char *argv [])
         endpoint = strdup(s_get (config, "malamute/endpoint", NULL));
         actor_name = strdup(s_get (config, "malamute/address", NULL));
         path = strdup(s_get (config, "parameters/path", NULL));
+
+        log_config_path = std::string (s_get (config, "log/config", DEFAULT_LOG_CONFIG));
     }
+
+    ManageFtyLog::getInstanceFtylog()->setConfigFile(log_config_path);
+
+    if (verbose)
+        ManageFtyLog::getInstanceFtylog()->setVeboseMode();
+
     // Sanity checks
     if (actor_name == NULL)
         actor_name = strdup(FTY_INFO_AGENT);
@@ -124,18 +136,9 @@ int main (int argc, char *argv [])
     if (str_linuxmetrics_interval == NULL)
         str_linuxmetrics_interval = strdup(STR_DEFAULT_LINUXMETRICS_INTERVAL_SEC);
 
-    // Check env. variables
-    if (getenv ("BIOS_LOG_LEVEL") && streq (getenv ("BIOS_LOG_LEVEL"), "LOG_DEBUG"))
-        verbose = true;
-
     zactor_t *server = zactor_new (fty_info_server, (void*) actor_name);
 
     //  Insert main code here
-    if (verbose) {
-        zstr_sendx (server, "VERBOSE", NULL);
-        zsys_info ("fty_info - Agent which returns rack controller information");
-    }
-
     zstr_sendx (server, "PATH", path, NULL);
     zstr_sendx (server, "CONFIG", hw_cap_path, NULL);
     zstr_sendx (server, "CONNECT", endpoint, actor_name, NULL);
@@ -147,9 +150,6 @@ int main (int argc, char *argv [])
 
     // Run once actor to fill data about rackcontroller-0
     zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void *) RC0_RUNONCE_ACTOR);
-    if (verbose) {
-        zstr_sendx (rc0_runonce, "VERBOSE", NULL);
-    }
     zstr_sendx (rc0_runonce, "CONNECT", endpoint, actor_name, NULL);
     zstr_sendx (rc0_runonce, "CONSUMER", FTY_PROTO_STREAM_ASSETS, "device\\.rackcontroller.*", NULL);
 

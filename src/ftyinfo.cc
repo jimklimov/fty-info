@@ -80,7 +80,7 @@ s_get_installation_date (
     }
     catch (const std::exception& e) {
         installation_date = "N/A - Undefined error occured";
-        zsys_error ("Exception caught: %s", e.what ());
+        log_error ("Exception caught: %s", e.what ());
     }
 }
 
@@ -96,10 +96,10 @@ s_load_release_details()
         std::stringstream s(json_string);
         cxxtools::JsonDeserializer json(s);
         json.deserialize (*si);
-        zsys_info("fty-info:load %s OK",RELEASE_DETAILS);
+        log_info("fty-info:load %s OK",RELEASE_DETAILS);
     }
     catch (const std::exception& e) {
-        zsys_error ("Error while parsing JSON: %s", e.what ());
+        log_error ("Error while parsing JSON: %s", e.what ());
     }
     return si;
 }
@@ -115,7 +115,7 @@ s_get_release_details
         si->getMember("release-details").getMember(key) >>= value;
     }
     catch (const std::exception& e) {
-        zsys_info ("Problem with getting %s in JSON: %s", key, e.what ());
+        log_info ("Problem with getting %s in JSON: %s", key, e.what ());
         if (dfl) {
             return strdup(dfl);
         } else {
@@ -141,34 +141,34 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     char *hostname = (char *) malloc (HOST_NAME_MAX+1);
     int rv = gethostname (hostname, HOST_NAME_MAX+1);
     if (rv == -1) {
-        zsys_warning ("ftyinfo could not be fully initialized (error while getting the hostname)");
+        log_warning ("ftyinfo could not be fully initialized (error while getting the hostname)");
         self->hostname = strdup("locahost");
     }
     else {
         self->hostname = strdup (hostname);
     }
     zstr_free (&hostname);
-    zsys_info ("fty-info:hostname  = '%s'", self->hostname);
+    log_info ("fty-info:hostname  = '%s'", self->hostname);
 
     //set id
     self->id = topologyresolver_id (resolver);
-    zsys_info ("fty-info:id        = '%s'", self->id);
+    log_info ("fty-info:id        = '%s'", self->id);
 
     //set name
     self->name = topologyresolver_to_rc_name (resolver);
-    zsys_info ("fty-info:name      = '%s'", self-> name);
+    log_info ("fty-info:name      = '%s'", self-> name);
 
     //set name_uri
     self->name_uri = topologyresolver_to_rc_name_uri (resolver);
-    zsys_info ("fty-info:name_uri  = '%s'", self-> name_uri);
+    log_info ("fty-info:name_uri  = '%s'", self-> name_uri);
 
     //set location
     self->location = topologyresolver_to_string (resolver, ">");
-    zsys_info ("fty-info:location  = '%s'", self->location);
+    log_info ("fty-info:location  = '%s'", self->location);
 
     //set parent_uri
     self->parent_uri = topologyresolver_to_parent_uri (resolver);
-    zsys_info ("fty-info:parent_uri= '%s'", self->parent_uri);
+    log_info ("fty-info:parent_uri= '%s'", self->parent_uri);
 
     //set uuid, vendor, product, part_number, verson from /etc/release-details.json
     cxxtools::SerializationInfo *si = nullptr;
@@ -180,26 +180,26 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     self->product  = s_get_release_details (si, "hardware-catalog-number", NULL);
     self->part_number  = s_get_release_details (si, "hardware-part-number", NULL);
     self->version   = s_get_release_details (si, "osimage-name", NULL);
-    zsys_info ("fty-info:uuid         = '%s'", self->uuid);
-    zsys_info ("fty-info:vendor       = '%s'", self->vendor);
-    zsys_info ("fty-info:manufacturer = '%s'", self->manufacturer);
-    zsys_info ("fty-info:serial       = '%s'", self->serial);
-    zsys_info ("fty-info:product        = '%s'", self->product);
-    zsys_info ("fty-info:part_number  = '%s'", self->part_number);
-    zsys_info ("fty-info:version      = '%s'", self->version);
+    log_info ("fty-info:uuid         = '%s'", self->uuid);
+    log_info ("fty-info:vendor       = '%s'", self->vendor);
+    log_info ("fty-info:manufacturer = '%s'", self->manufacturer);
+    log_info ("fty-info:serial       = '%s'", self->serial);
+    log_info ("fty-info:product        = '%s'", self->product);
+    log_info ("fty-info:part_number  = '%s'", self->part_number);
+    log_info ("fty-info:version      = '%s'", self->version);
 
     // set description, contact
     self->description = topologyresolver_to_description (resolver);
     self->contact = topologyresolver_to_contact (resolver);
-    zsys_info ("fty-info:description     = '%s'", self->description);
-    zsys_info ("fty-info:contact     = '%s'", self->contact);
+    log_info ("fty-info:description     = '%s'", self->description);
+    log_info ("fty-info:contact     = '%s'", self->contact);
 
     //set installDate
     char *license = s_get_accepted_license_file ();
     std::string datetime;
     s_get_installation_date (license, datetime);
     self->installDate = strdup (datetime.c_str ());
-    zsys_info ("fty-info:installDate     = '%s'", self->installDate);
+    log_info ("fty-info:installDate     = '%s'", self->installDate);
     zstr_free (&license);
 
     // use default
@@ -207,10 +207,10 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     self->protocol_format = strdup (TXT_PROTO_FORMAT);
     self->type = strdup (TXT_TYPE);
     self->txtvers   = strdup (TXT_VER);
-    zsys_info ("fty-info:path = '%s'", self->path);
-    zsys_info ("fty-info:protocol_format = '%s'", self->protocol_format);
-    zsys_info ("fty-info:type = '%s'", self->type);
-    zsys_info ("fty-info:txtvers = '%s'", self->txtvers);
+    log_info ("fty-info:path = '%s'", self->path);
+    log_info ("fty-info:protocol_format = '%s'", self->protocol_format);
+    log_info ("fty-info:type = '%s'", self->type);
+    log_info ("fty-info:txtvers = '%s'", self->txtvers);
 
     // search for IPv4 addresses
     int counter = 0;

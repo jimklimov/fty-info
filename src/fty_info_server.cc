@@ -47,7 +47,6 @@ struct _fty_info_server_t {
     mlm_client_t *client;
     mlm_client_t *announce_client;
     mlm_client_t *info_client;
-    bool verbose;
     bool first_announce;
     bool test;
     topologyresolver_t* resolver;
@@ -89,7 +88,6 @@ info_server_new (char *name)
     self->client = mlm_client_new ();
     self->announce_client = mlm_client_new ();
     self->info_client = mlm_client_new ();
-    self->verbose=false;
     self->first_announce=true;
     self->test = false;
     self->history = zhashx_new();
@@ -211,16 +209,16 @@ s_publish_announce(fty_info_server_t  * self)
 
     if (self->first_announce) {
         if (mlm_client_send (self->announce_client, "CREATE", &msg) != -1) {
-            zsys_info("publish CREATE msg on ANNOUNCE STREAM");
+            log_info("publish CREATE msg on ANNOUNCE STREAM");
             self->first_announce=false;
         }
         else
-            zsys_error("cant publish CREATE msg on ANNOUNCE STREAM");
+            log_error("cant publish CREATE msg on ANNOUNCE STREAM");
     } else {
         if (mlm_client_send (self->announce_client, "UPDATE", &msg) != -1)
-            zsys_info("publish UPDATE msg on ANNOUNCE STREAM");
+            log_info("publish UPDATE msg on ANNOUNCE STREAM");
         else
-            zsys_error("cant publish UPDATE msg on ANNOUNCE STREAM");
+            log_error("cant publish UPDATE msg on ANNOUNCE STREAM");
     }
     ftyinfo_destroy (&info);
 }
@@ -245,7 +243,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     linuxmetric_t *metric = (linuxmetric_t *) zlistx_first (info);
     while (metric) {
         char *value = zsys_sprintf ("%lf", metric->value);
-        zsys_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
+        log_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
         zmsg_t *msg = fty_proto_encode_metric (
                 NULL,
                 ::time (NULL),
@@ -257,10 +255,10 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
                 );
         char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
         if (mlm_client_send (self->info_client, subject, &msg) != -1) {
-            zsys_info ("Metric %s published on METRICS stream", metric->type);
+            log_info ("Metric %s published on METRICS stream", metric->type);
         }
         else {
-            zsys_error ("Can't publish metric %s on METRICS stream", metric->type);
+            log_error ("Can't publish metric %s on METRICS stream", metric->type);
         }
         linuxmetric_destroy (&metric);
         metric = (linuxmetric_t *) zlistx_next (info);
@@ -284,11 +282,11 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     char *command = zmsg_popstr (message);
     if (!command) {
         zmsg_destroy (&message);
-        zsys_warning ("Empty command.");
+        log_warning ("Empty command.");
         return true;
     }
     if (streq(command, "$TERM")) {
-        zsys_info ("Got $TERM");
+        log_info ("Got $TERM");
         zmsg_destroy (&message);
         zstr_free (&command);
         return false;
@@ -301,18 +299,13 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             if (!self->test)
                 topologyresolver_set_endpoint (self->resolver, endpoint);
             self->endpoint = strdup(endpoint);
-            zsys_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
+            log_debug ("fty-info: CONNECT: %s/%s", self->endpoint, self->name);
             int rv = mlm_client_connect (self->client, self->endpoint, 1000, self->name);
             if (rv == -1)
-                zsys_error("mlm_client_connect failed\n");
+                log_error("mlm_client_connect failed\n");
 
         }
         zstr_free (&endpoint);
-    }
-    else
-    if (streq (command, "VERBOSE")) {
-        self->verbose = true;
-        zsys_debug ("fty-info: VERBOSE=true");
     }
     else
     if (streq (command, "PATH")) {
@@ -320,7 +313,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
 
         if (path) {
             self->path = strdup(path);
-            zsys_debug ("fty-info: PATH: %s", self->path);
+            log_debug ("fty-info: PATH: %s", self->path);
         }
         zstr_free (&path);
     }
@@ -330,7 +323,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         char* pattern = zmsg_popstr (message);
         int rv = mlm_client_set_consumer (self->client, stream, pattern);
         if (rv == -1)
-            zsys_error ("%s: can't set consumer on stream '%s', '%s'",
+            log_error ("%s: can't set consumer on stream '%s', '%s'",
                     self->name, stream, pattern);
         zstr_free (&pattern);
         zstr_free (&stream);
@@ -344,16 +337,16 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 zmsg_t *republish = zmsg_new ();
                 int rv = mlm_client_sendto (self->client, FTY_ASSET_AGENT, "REPUBLISH", NULL, 5000, &republish);
                 if ( rv != 0) {
-                     zsys_error ("%s: cannot send REPUBLISH message", self->name);
+                     log_error ("%s: cannot send REPUBLISH message", self->name);
                      zmsg_destroy (&republish);
                 }
             }
             int rv = mlm_client_connect (self->announce_client, self->endpoint, 1000, "fty_info_announce");
             if (rv == -1)
-                    zsys_error("fty_info_announce : mlm_client_connect failed\n");
+                    log_error("fty_info_announce : mlm_client_connect failed\n");
             rv = mlm_client_set_producer (self->announce_client, stream);
             if (rv == -1)
-                zsys_error ("%s: can't set producer on stream '%s'",
+                log_error ("%s: can't set producer on stream '%s'",
                         self->name, stream);
             else
                 //do the first announce
@@ -363,10 +356,10 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
             self->test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
-                    zsys_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
+                    log_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
             rv = mlm_client_set_producer (self->info_client, stream);
             if (rv == -1)
-                zsys_error ("%s: can't set producer on stream '%s'",
+                log_error ("%s: can't set producer on stream '%s'",
                         self->name, stream);
             else
                 //publish the first metrics
@@ -375,20 +368,20 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
         else {
             int rv = mlm_client_set_producer (self->client, stream);
             if (rv == -1)
-                zsys_error ("%s: can't set producer on stream '%s'",
+                log_error ("%s: can't set producer on stream '%s'",
                         self->name, stream);
         }
         zstr_free (&stream);
     }
     else if (streq (command, "LINUXMETRICSINTERVAL")) {
         char *interval = zmsg_popstr (message);
-        zsys_info ("Will be publishing metrics each %s seconds", interval);
+        log_info ("Will be publishing metrics each %s seconds", interval);
         self->linuxmetrics_interval = (int) strtol (interval, NULL, 10);
         zstr_free (&interval);
     }
     else if (streq (command, "ROOT_DIR")) {
         char *root_dir = zmsg_popstr (message);
-        zsys_info ("Will be using %s as root dir for finding out Linux metrics", root_dir);
+        log_info ("Will be using %s as root dir for finding out Linux metrics", root_dir);
         self->root_dir.assign (root_dir);
         zstr_free (&root_dir);
     }
@@ -404,10 +397,10 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
     else if (streq (command, "CONFIG")) {
         self->hw_cap_path = zmsg_popstr (message);
         if (!self->hw_cap_path)
-            zsys_error ("%s: hw_cap_path missing", command);
+            log_error ("%s: hw_cap_path missing", command);
     }
     else
-        zsys_error ("fty-info: Unknown actor command: %s.\n", command);
+        log_error ("fty-info: Unknown actor command: %s.\n", command);
 
     zstr_free (&command);
     zmsg_destroy (&message);
@@ -435,7 +428,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
 
     if (!cap)
     {
-        zsys_debug ("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
+        log_debug ("s_hw_cap: cannot load capability file from %s", self->hw_cap_path);
         return msg;
     }
 
@@ -494,7 +487,7 @@ s_hw_cap (fty_info_server_t *self, const char *type, char *zuuid)
     }
     else
     {
-        zsys_info ("s_hw_cap: unsuported request for '%s'", type);
+        log_info ("s_hw_cap: unsuported request for '%s'", type);
 
         zmsg_addstr (msg, zuuid);
         zmsg_addstr (msg, "ERROR");
@@ -518,7 +511,7 @@ s_handle_stream (fty_info_server_t* self, zmsg_t *message)
     }
     fty_proto_t *bmessage = fty_proto_decode (&message);
     if (!bmessage ) {
-        zsys_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
+        log_error ("can't decode message with subject %s, ignoring", mlm_client_subject (self->client));
         zmsg_destroy (&message);
         return;
     }
@@ -545,7 +538,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     char *command = zmsg_popstr (message);
     if (!command) {
         zmsg_destroy (&message);
-        zsys_warning ("Empty command.");
+        log_warning ("Empty command.");
         return;
     }
 
@@ -585,10 +578,10 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
     else
     if (streq (command, "ERROR")) {
         // Don't reply to ERROR messages
-        zsys_warning ("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender (self->client));
+        log_warning ("%s: Received ERROR command from '%s', ignoring", self->name, mlm_client_sender (self->client));
     }
     else {
-        zsys_warning ("%s: Received unexpected command '%s'", self->name, command);
+        log_warning ("%s: Received unexpected command '%s'", self->name, command);
 
         reply = zmsg_new ();
         if (NULL != zuuid)
@@ -606,7 +599,7 @@ s_handle_mailbox(fty_info_server_t* self,zmsg_t *message)
                                     1000,
                                     &reply);
         if (rv != 0)
-            zsys_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
+            log_error ("s_handle_mailbox: failed to send reply to %s ", mlm_client_sender (self->client));
     }
 
     zstr_free (&zuuid);
@@ -624,7 +617,7 @@ fty_info_server (zsock_t *pipe, void *args)
 {
     char *name = (char *)args;
     if (!name) {
-        zsys_error ("Address for fty-info actor is NULL");
+        log_error ("Address for fty-info actor is NULL");
         return;
     }
 
@@ -633,7 +626,7 @@ fty_info_server (zsock_t *pipe, void *args)
     assert (poller);
 
     zsock_signal (pipe, 0);
-    zsys_info ("fty-info: Started");
+    log_info ("fty-info: Started");
 
 
     while (!zsys_interrupted)
@@ -645,8 +638,7 @@ fty_info_server (zsock_t *pipe, void *args)
             }
         }
         if (which == pipe) {
-            if (self->verbose)
-                zsys_debug ("which == pipe");
+            log_debug ("which == pipe");
             if(!s_handle_pipe(self,zmsg_recv (pipe)))
                 break;//TERM
             else continue;
@@ -685,16 +677,12 @@ fty_info_server_test (bool verbose)
 
     zactor_t *server = zactor_new (mlm_server, (void*) "Malamute");
     zstr_sendx (server, "BIND", endpoint, NULL);
-    if (verbose)
-        zstr_send (server, "VERBOSE");
 
     mlm_client_t *client = mlm_client_new ();
     mlm_client_connect (client, endpoint, 1000, "fty_info_server_test");
 
 
     zactor_t *info_server = zactor_new (fty_info_server, (void*) "fty-info");
-    if (verbose)
-        zstr_send (info_server, "VERBOSE");
     zstr_sendx (info_server, "TEST", NULL);
     zstr_sendx (info_server, "PATH", DEFAULT_PATH, NULL);
     zstr_sendx (info_server, "CONNECT", endpoint, NULL);
@@ -703,7 +691,7 @@ fty_info_server_test (bool verbose)
 
     // Test #1: request INFO-TEST
     {
-        zsys_debug ("fty-info-test:Test #1");
+        log_debug ("fty-info-test:Test #1");
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO-TEST");
         zuuid_t *zuuid = zuuid_new ();
@@ -713,7 +701,7 @@ fty_info_server_test (bool verbose)
         zmsg_t *recv = mlm_client_recv (client);
 
         assert (zmsg_size (recv) == 7);
-        zsys_debug ("fty-info-test: zmsg_size = %d",zmsg_size (recv));
+        log_debug ("fty-info-test: zmsg_size = %d",zmsg_size (recv));
         char *zuuid_reply = zmsg_popstr (recv);
         assert (zuuid_reply && streq (zuuid_str_canonical(zuuid), zuuid_reply));
 
@@ -721,53 +709,53 @@ fty_info_server_test (bool verbose)
         assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name = zmsg_popstr (recv);
         assert (srv_name && streq (srv_name,"IPC (ce7c523e)"));
-        zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
+        log_debug ("fty-info-test: srv name = '%s'", srv_name);
         char *srv_type = zmsg_popstr (recv);
         assert (srv_type && streq (srv_type,SRV_TYPE));
-        zsys_debug ("fty-info-test: srv type = '%s'", srv_type);
+        log_debug ("fty-info-test: srv type = '%s'", srv_type);
         char *srv_stype = zmsg_popstr (recv);
         assert (srv_stype && streq (srv_stype,SRV_STYPE));
-        zsys_debug ("fty-info-test: srv stype = '%s'", srv_stype);
+        log_debug ("fty-info-test: srv stype = '%s'", srv_stype);
         char *srv_port = zmsg_popstr (recv);
         assert (srv_port && streq (srv_port,SRV_PORT));
-        zsys_debug ("fty-info-test: srv port = '%s'", srv_port);
+        log_debug ("fty-info-test: srv port = '%s'", srv_port);
 
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
         char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
         assert(uuid && streq (uuid,TST_UUID));
-        zsys_debug ("fty-info-test: uuid = '%s'", uuid);
+        log_debug ("fty-info-test: uuid = '%s'", uuid);
         char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
         assert(hostname && streq (hostname, TST_HOSTNAME));
-        zsys_debug ("fty-info-test: hostname = '%s'", hostname);
+        log_debug ("fty-info-test: hostname = '%s'", hostname);
         char * name = (char *) zhash_lookup (infos, INFO_NAME);
         assert(name && streq (name, TST_NAME));
-        zsys_debug ("fty-info-test: name = '%s'", name);
+        log_debug ("fty-info-test: name = '%s'", name);
         char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
         assert(name_uri && streq (name_uri, TST_NAME_URI));
-        zsys_debug ("fty-info-test: name_uri = '%s'", name_uri);
+        log_debug ("fty-info-test: name_uri = '%s'", name_uri);
         char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
         assert(vendor && streq (vendor, TST_VENDOR));
-        zsys_debug ("fty-info-test: vendor = '%s'", vendor);
+        log_debug ("fty-info-test: vendor = '%s'", vendor);
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
-        zsys_debug ("fty-info-test: serial = '%s'", serial);
+        log_debug ("fty-info-test: serial = '%s'", serial);
         char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
         assert(product && streq (product, TST_PRODUCT));
-        zsys_debug ("fty-info-test: product = '%s'", product);
+        log_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
-        zsys_debug ("fty-info-test: location = '%s'", location);
+        log_debug ("fty-info-test: location = '%s'", location);
         char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
         assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
-        zsys_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
+        log_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
-        zsys_debug ("fty-info-test: version = '%s'", version);
+        log_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
         assert(rest_root && streq (rest_root, DEFAULT_PATH));
-        zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
+        log_debug ("fty-info-test: rest_path = '%s'", rest_root);
         zstr_free (&zuuid_reply);
         zstr_free (&cmd);
         zstr_free (&srv_name);
@@ -778,11 +766,11 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #1: OK");
+        log_info ("fty-info-test:Test #1: OK");
     }
     // Test #2: request INFO
     {
-        zsys_debug ("fty-info-test:Test #2");
+        log_debug ("fty-info-test:Test #2");
         zmsg_t *request = zmsg_new ();
         zmsg_addstr (request, "INFO");
         zuuid_t *zuuid = zuuid_new ();
@@ -809,7 +797,7 @@ fty_info_server_test (bool verbose)
         char *value = (char *) zhash_first (infos);   // first value
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
-            zsys_debug ("fty-info-test: %s = %s",key,value);
+            log_debug ("fty-info-test: %s = %s",key,value);
             value     = (char *) zhash_next (infos);   // next value
         }
         zstr_free (&zuuid_reply);
@@ -822,14 +810,14 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #2: OK");
+        log_info ("fty-info-test:Test #2: OK");
     }
     mlm_client_t *asset_generator = mlm_client_new ();
     mlm_client_connect (asset_generator, endpoint, 1000, "fty_info_asset_generator");
     mlm_client_set_producer (asset_generator, FTY_PROTO_STREAM_ASSETS);
     // Test #3: process asset message - CREATE RC
     {
-        zsys_debug ("fty-info-test:Test #3");
+        log_debug ("fty-info-test:Test #3");
         const char *name = TST_NAME;
         const char *parent = TST_PARENT_INAME;
         zhash_t* aux = zhash_new ();
@@ -879,7 +867,7 @@ fty_info_server_test (bool verbose)
         char *value = (char *) zhash_first (infos);   // first value
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
-            zsys_debug ("fty-info-test: %s = %s",key,value);
+            log_debug ("fty-info-test: %s = %s",key,value);
             if (streq (key, INFO_NAME))
                 assert (streq (value, TST_NAME));
             if (streq (key, INFO_NAME_URI))
@@ -898,11 +886,11 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #3: OK");
+        log_info ("fty-info-test:Test #3: OK");
     }
     //TEST #4: process asset message - UPDATE RC (change location)
     {
-        zsys_debug ("fty-info-test:Test #4");
+        log_debug ("fty-info-test:Test #4");
         zhash_t* aux = zhash_new ();
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
@@ -951,7 +939,7 @@ fty_info_server_test (bool verbose)
         char *value = (char *) zhash_first (infos);   // first value
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
-            zsys_debug ("fty-info-test: %s = %s",key,value);
+            log_debug ("fty-info-test: %s = %s",key,value);
             // if (streq (key, INFO_NAME))
             //     assert (streq (value, TST_NAME));
             // if (streq (key, INFO_NAME_URI))
@@ -970,12 +958,12 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #4: OK");
+        log_info ("fty-info-test:Test #4: OK");
     }
     //TEST #5: process asset message - do not process CREATE RC with IP address
     // which does not belong to us
     {
-        zsys_debug ("fty-info-test:Test #5");
+        log_debug ("fty-info-test:Test #5");
         zhash_t* aux = zhash_new ();
         zhash_t *ext = zhash_new ();
         zhash_autofree (aux);
@@ -1024,7 +1012,7 @@ fty_info_server_test (bool verbose)
         char *value = (char *) zhash_first (infos);   // first value
         while ( value != NULL )  {
             char *key = (char *) zhash_cursor (infos);   // key of this value
-            zsys_debug ("fty-info-test: %s = %s",key,value);
+            log_debug ("fty-info-test: %s = %s",key,value);
             // if (streq (key, INFO_NAME))
             //     assert (streq (value, TST_NAME));
             // if (streq (key, INFO_NAME_URI))
@@ -1043,11 +1031,11 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         zmsg_destroy (&request);
         zuuid_destroy (&zuuid);
-        zsys_info ("fty-info-test:Test #5: OK");
+        log_info ("fty-info-test:Test #5: OK");
     }
     // TEST #6 : test STREAM announce
     {
-        zsys_debug ("fty-info-test:Test #6");
+        log_debug ("fty-info-test:Test #6");
         int rv = mlm_client_set_consumer (client, "ANNOUNCE-TEST", ".*");
         assert(rv>=0);
         zstr_sendx (info_server, "PRODUCER", "ANNOUNCE-TEST", NULL);
@@ -1059,53 +1047,53 @@ fty_info_server_test (bool verbose)
         assert (cmd && streq (cmd, FTY_INFO_CMD));
         char *srv_name = zmsg_popstr (recv);
         assert (srv_name && streq (srv_name,"IPC (ce7c523e)"));
-        zsys_debug ("fty-info-test: srv name = '%s'", srv_name);
+        log_debug ("fty-info-test: srv name = '%s'", srv_name);
         char *srv_type = zmsg_popstr (recv);
         assert (srv_type && streq (srv_type,SRV_TYPE));
-        zsys_debug ("fty-info-test: srv type = '%s'", srv_type);
+        log_debug ("fty-info-test: srv type = '%s'", srv_type);
         char *srv_stype = zmsg_popstr (recv);
         assert (srv_stype && streq (srv_stype,SRV_STYPE));
-        zsys_debug ("fty-info-test: srv stype = '%s'", srv_stype);
+        log_debug ("fty-info-test: srv stype = '%s'", srv_stype);
         char *srv_port = zmsg_popstr (recv);
         assert (srv_port && streq (srv_port,SRV_PORT));
-        zsys_debug ("fty-info-test: srv port = '%s'", srv_port);
+        log_debug ("fty-info-test: srv port = '%s'", srv_port);
 
         zframe_t *frame_infos = zmsg_next (recv);
         zhash_t *infos = zhash_unpack(frame_infos);
 
         char * uuid = (char *) zhash_lookup (infos, INFO_UUID);
         assert(uuid && streq (uuid,TST_UUID));
-        zsys_debug ("fty-info-test: uuid = '%s'", uuid);
+        log_debug ("fty-info-test: uuid = '%s'", uuid);
         char * hostname = (char *) zhash_lookup (infos, INFO_HOSTNAME);
         assert(hostname && streq (hostname, TST_HOSTNAME));
-        zsys_debug ("fty-info-test: hostname = '%s'", hostname);
+        log_debug ("fty-info-test: hostname = '%s'", hostname);
         char * name = (char *) zhash_lookup (infos, INFO_NAME);
         assert(name && streq (name, TST_NAME));
-        zsys_debug ("fty-info-test: name = '%s'", name);
+        log_debug ("fty-info-test: name = '%s'", name);
         char * name_uri = (char *) zhash_lookup (infos, INFO_NAME_URI);
         assert(name_uri && streq (name_uri, TST_NAME_URI));
-        zsys_debug ("fty-info-test: name_uri = '%s'", name_uri);
+        log_debug ("fty-info-test: name_uri = '%s'", name_uri);
         char * vendor = (char *) zhash_lookup (infos, INFO_VENDOR);
         assert(vendor && streq (vendor, TST_VENDOR));
-        zsys_debug ("fty-info-test: vendor = '%s'", vendor);
+        log_debug ("fty-info-test: vendor = '%s'", vendor);
         char * serial = (char *) zhash_lookup (infos, INFO_SERIAL);
         assert(serial && streq (serial, TST_SERIAL));
-        zsys_debug ("fty-info-test: serial = '%s'", serial);
+        log_debug ("fty-info-test: serial = '%s'", serial);
         char * product = (char *) zhash_lookup (infos, INFO_PRODUCT);
         assert(product && streq (product, TST_PRODUCT));
-        zsys_debug ("fty-info-test: product = '%s'", product);
+        log_debug ("fty-info-test: product = '%s'", product);
         char * location = (char *) zhash_lookup (infos, INFO_LOCATION);
         assert(location && streq (location, TST_LOCATION));
-        zsys_debug ("fty-info-test: location = '%s'", location);
+        log_debug ("fty-info-test: location = '%s'", location);
         char * parent_uri = (char *) zhash_lookup (infos, INFO_PARENT_URI);
         assert(parent_uri && streq (parent_uri, TST_PARENT_URI));
-        zsys_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
+        log_debug ("fty-info-test: parent_uri = '%s'", parent_uri);
         char * version = (char *) zhash_lookup (infos, INFO_VERSION);
         assert(version && streq (version, TST_VERSION));
-        zsys_debug ("fty-info-test: version = '%s'", version);
+        log_debug ("fty-info-test: version = '%s'", version);
         char * rest_root = (char *) zhash_lookup (infos, INFO_REST_PATH);
         assert(rest_root && streq (rest_root, DEFAULT_PATH));
-        zsys_debug ("fty-info-test: rest_path = '%s'", rest_root);
+        log_debug ("fty-info-test: rest_path = '%s'", rest_root);
 
 
         zstr_free (&srv_name);
@@ -1116,14 +1104,14 @@ fty_info_server_test (bool verbose)
 
         zhash_destroy(&infos);
         zmsg_destroy (&recv);
-        zsys_info ("fty-info-test:Test #6: OK");
+        log_info ("fty-info-test:Test #6: OK");
     }
     mlm_client_t *metric_reader = mlm_client_new ();
     mlm_client_connect (metric_reader, endpoint, 1000, "fty_info_metric_reader");
     mlm_client_set_consumer (metric_reader, "METRICS-TEST", ".*");
     // TEST #7 : test metrics - just types
     {
-        zsys_debug ("fty-info-test:Test #7");
+        log_debug ("fty-info-test:Test #7");
 
         // Note: If your selftest reads SCMed fixture data, please keep it in
         // src/selftest-ro; if your test creates filesystem objects, please
@@ -1167,7 +1155,7 @@ fty_info_server_test (bool verbose)
         const char *state = (const char *) zhashx_first (interfaces);
         while (state != NULL)  {
             const char *iface = (const char *) zhashx_cursor (interfaces);
-            zsys_debug ("interface %s = %s", iface, state);
+            log_debug ("interface %s = %s", iface, state);
 
             if (streq (state, "up")) {
                 // we have 3 network metrics: bandwidth, bytes, error_ratio
@@ -1239,7 +1227,7 @@ fty_info_server_test (bool verbose)
         state = (const char *) zhashx_first (interfaces);
         while (state != NULL)  {
             const char *iface = (const char *) zhashx_cursor (interfaces);
-            zsys_debug ("interface %s = %s", iface, state);
+            log_debug ("interface %s = %s", iface, state);
 
             if (streq (state, "up")) {
                 char *rx_bandwidth = zsys_sprintf (BANDWIDTH_TEMPLATE, "rx", iface);
@@ -1289,11 +1277,11 @@ fty_info_server_test (bool verbose)
 
         zhashx_destroy (&interfaces);
         zhashx_destroy (&metrics);
-        zsys_info ("fty-info-test:Test #7: OK");
+        log_info ("fty-info-test:Test #7: OK");
     }
     {
         // TEST #8: hw capability info
-        zsys_info ("fty-info-test:Test #8: starting");
+        log_info ("fty-info-test:Test #8: starting");
         zstr_sendx (info_server, "CONFIG", "./src/selftest-ro/data/hw_cap", NULL);
 
         zmsg_t *hw_req = zmsg_new ();
@@ -1333,11 +1321,11 @@ fty_info_server_test (bool verbose)
         zstr_free (&val);
 
         zmsg_destroy (&recv);
-        zsys_info ("OK\n");
+        log_info ("OK\n");
     }
     {
         // TEST #9: hw capability info
-        zsys_info ("fty-info-test:Test #9: starting");
+        log_info ("fty-info-test:Test #9: starting");
 
         zmsg_t *hw_req = zmsg_new ();
         zmsg_addstr (hw_req, "HW_CAP");
@@ -1361,11 +1349,11 @@ fty_info_server_test (bool verbose)
         zstr_free (&val);
 
         zmsg_destroy (&recv);
-        zsys_info ("OK\n");
+        log_info ("OK\n");
     }
     {
         // TEST #10: hw capability: type
-        zsys_info ("fty-info-test:Test #10: hardware/type");
+        log_info ("fty-info-test:Test #10: hardware/type");
         zmsg_t *hw_req = zmsg_new ();
         zmsg_addstr (hw_req, "HW_CAP");
         zmsg_addstr (hw_req, "uuid1235");
@@ -1391,7 +1379,7 @@ fty_info_server_test (bool verbose)
         assert (zmsg_popstr (recv) == NULL);
 
         zmsg_destroy (&recv);
-        zsys_info ("OK\n");
+        log_info ("OK\n");
     }
 
 
@@ -1402,5 +1390,5 @@ fty_info_server_test (bool verbose)
     mlm_client_destroy (&client);
     zactor_destroy (&info_server);
     zactor_destroy (&server);
-    zsys_info ("OK\n");
+    log_info ("OK\n");
 }

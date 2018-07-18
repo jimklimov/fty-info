@@ -440,7 +440,7 @@ topologyresolver_to_list (topologyresolver_t *self)
             // ask ASSET_AGENT for ASSET_DETAIL
             if (mlm_client_connected (self->client)) {
                 zuuid_t *uuid = zuuid_new ();
-                zsys_debug ("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
+                log_debug ("ask ASSET AGENT for ASSET_DETAIL, RC = %s, iname = %s", self->iname, parent);
                 mlm_client_sendtox (self->client, FTY_ASSET_AGENT, "ASSET_DETAIL",
                         "GET", zuuid_str_canonical (uuid), parent, NULL);
                 zmsg_t *parent_msg = mlm_client_recv (self->client);
