@@ -56,15 +56,15 @@ s_get_field (std::string line, int index)
             return std::stod (field);
         }
         catch (std::istringstream::failure e) {
-            zsys_error ("Error while parsing string %s", line.c_str ());
+            log_error ("Error while parsing string %s", line.c_str ());
             return std::numeric_limits<double>::quiet_NaN ();
         }
         catch (std::invalid_argument& e) {
-            zsys_error ("Requested field %s is not a double", field.c_str ());
+            log_error ("Requested field %s is not a double", field.c_str ());
             return std::numeric_limits<double>::quiet_NaN ();
         }
         catch (std::out_of_range& e) {
-            zsys_error ("Requested field %s is out of range", field.c_str ());
+            log_error ("Requested field %s is out of range", field.c_str ());
             return std::numeric_limits<double>::quiet_NaN ();
         }
 }
@@ -76,7 +76,7 @@ s_getline_by_number (std::string filename, int index)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename.c_str ());
+        log_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -93,7 +93,7 @@ s_getline_by_number (std::string filename, int index)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename.c_str ());
+        log_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
@@ -104,7 +104,7 @@ s_getline_by_name (std::string filename, const char *name)
 {
     std::ifstream file (filename, std::ifstream::in);
     if (!file) {
-        zsys_error ("Could not open '%s'", filename.c_str ());
+        log_error ("Could not open '%s'", filename.c_str ());
         return "";
     }
 
@@ -117,7 +117,7 @@ s_getline_by_name (std::string filename, const char *name)
         return line;
     }
     catch (std::ifstream::failure e) {
-        zsys_error ("Error while reading file %s", filename.c_str ());
+        log_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
 }
@@ -332,7 +332,7 @@ static zlistx_t *
     double value_last = 0;
     if (NULL != value_last_ptr) {
         value_last = *value_last_ptr;
-        zsys_debug ("%s:key found, value %lf", last_key, value_last);
+        log_debug ("%s:key found, value %lf", last_key, value_last);
     }
 
     zlistx_t *network_usage_info = zlistx_new ();
@@ -385,7 +385,7 @@ static linuxmetric_t *
     double value_last_errors = 0;
     if (NULL != value_last_errors_ptr) {
         value_last_errors = *value_last_errors_ptr;
-        zsys_debug ("%s:key found, value %lf", last_errors_key, value_last_errors);
+        log_debug ("%s:key found, value %lf", last_errors_key, value_last_errors);
     }
 
     char *last_packets_key = zsys_sprintf ("%s_%s_%s_packets", NETWORK_HISTORY_PREFIX, direction, interface);
@@ -393,7 +393,7 @@ static linuxmetric_t *
     double value_last_packets = 0;
     if (NULL != value_last_packets_ptr) {
         value_last_packets = *value_last_packets_ptr;
-        zsys_debug ("%s:key found, value %lf", last_packets_key, value_last_packets);
+        log_debug ("%s:key found, value %lf", last_packets_key, value_last_packets);
     }
 
     std::string format_errors (root_dir + "sys/class/net/%s/statistics/%s_errors");
@@ -575,7 +575,7 @@ linuxmetric_get_all
     const char *state = (const char *) zhashx_first (interfaces);
     while (state != NULL)  {
         const char *iface = (const char *) zhashx_cursor (interfaces);
-        zsys_debug ("interface %s = %s", iface, state);
+        log_debug ("interface %s = %s", iface, state);
 
         if (streq (state, "up")) {
             zlistx_t *rx = s_network_usage (iface, "rx", interval, history, root_dir);

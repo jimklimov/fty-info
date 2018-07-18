@@ -57,6 +57,8 @@ BuildRequires:  czmq-devel
 BuildRequires:  malamute-devel
 BuildRequires:  fty-proto-devel
 BuildRequires:  cxxtools-devel
+BuildRequires:  log4cplus-devel
+BuildRequires:  fty-common-logging-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -86,6 +88,8 @@ Requires:       czmq-devel
 Requires:       malamute-devel
 Requires:       fty-proto-devel
 Requires:       cxxtools-devel
+Requires:       log4cplus-devel
+Requires:       fty-common-logging-devel
 
 %description devel
 agent which returns rack controller information development tools

@@ -30,6 +30,8 @@ Build-Depends: debhelper (>= 9),
     libmlm-dev,
     libfty-proto-dev,
     libcxxtools-dev,
+    liblog4cplus-dev,
+    libfty-common-logging-dev,
     systemd,
     dh-systemd,
     asciidoc-base | asciidoc, xmlto,
@@ -53,6 +55,8 @@ Depends:
     libmlm-dev,
     libfty-proto-dev,
     libcxxtools-dev,
+    liblog4cplus-dev,
+    libfty-common-logging-dev,
     libfty-info1 (= ${binary:Version})
 Description: fty-info development tools
  This package contains development files for fty-info:

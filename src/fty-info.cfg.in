@@ -12,4 +12,5 @@ malamute
     address = fty-info          #   Agent address
 parameters
     path = /api/v1/admin/info   #path to get general informations from fty-info
- 
+log
+    config = /etc/fty/ftylog.cfg
