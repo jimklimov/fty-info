@@ -255,7 +255,7 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
                 );
         char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
         if (mlm_client_send (self->info_client, subject, &msg) != -1) {
-            log_info ("Metric %s published on METRICS stream", metric->type);
+            log_trace ("Metric %s published on METRICS stream", metric->type);
         }
         else {
             log_error ("Can't publish metric %s on METRICS stream", metric->type);
@@ -638,7 +638,7 @@ fty_info_server (zsock_t *pipe, void *args)
             }
         }
         if (which == pipe) {
-            log_debug ("which == pipe");
+            log_trace ("which == pipe");
             if(!s_handle_pipe(self,zmsg_recv (pipe)))
                 break;//TERM
             else continue;
