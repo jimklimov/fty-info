@@ -32,9 +32,9 @@
 //  External dependencies
 #include <czmq.h>
 #include <malamute.h>
+#include <fty_log.h>
 #include <ftyproto.h>
 #include <cxxtools/allocator.h>
-#include <fty_log.h>
 
 //  FTY_INFO version macros for compile-time API detection
 #define FTY_INFO_VERSION_MAJOR 1
