@@ -55,10 +55,10 @@ BuildRequires:  libsodium-devel
 BuildRequires:  zeromq-devel
 BuildRequires:  czmq-devel
 BuildRequires:  malamute-devel
-BuildRequires:  fty-proto-devel
-BuildRequires:  cxxtools-devel
 BuildRequires:  log4cplus-devel
 BuildRequires:  fty-common-logging-devel
+BuildRequires:  fty-proto-devel
+BuildRequires:  cxxtools-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -86,10 +86,10 @@ Requires:       libsodium-devel
 Requires:       zeromq-devel
 Requires:       czmq-devel
 Requires:       malamute-devel
-Requires:       fty-proto-devel
-Requires:       cxxtools-devel
 Requires:       log4cplus-devel
 Requires:       fty-common-logging-devel
+Requires:       fty-proto-devel
+Requires:       cxxtools-devel
 
 %description devel
 agent which returns rack controller information development tools
