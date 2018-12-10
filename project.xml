@@ -31,12 +31,12 @@
     <abi current = "1" revision = "0" age = "0" />
 
     <use project = "czmq"
-        repository="https://github.com/42ity/czmq.git"
+        repository = "https://github.com/42ity/czmq.git"
         release = "v3.0.2-FTY-master"
         min_major = "3" min_minor = "0" min_patch = "2" >
 
         <use project = "libzmq"
-            repository="https://github.com/42ity/libzmq.git"
+            repository = "https://github.com/42ity/libzmq.git"
             release = "4.2.0-FTY-master" >
 
             <use project = "libsodium" prefix = "sodium"
@@ -47,11 +47,11 @@
     </use>
 
     <use project = "malamute" min_major = "1" test = "mlm_server_test"
-        repository="https://github.com/42ity/malamute.git"
+        repository = "https://github.com/42ity/malamute.git"
         release = "1.0-FTY-master"
         />
 
-    <use project = "fty-common-logging" libname = "libfty_common_logging" header="fty_log.h"
+    <use project = "fty-common-logging" libname = "libfty_common_logging" header = "fty_log.h"
         repository = "https://github.com/42ity/fty-common-logging.git"
         release = "master"
         test = "fty_common_logging_selftest" >
@@ -62,19 +62,19 @@
             />
     </use>
 
-    <use project = "fty-proto" libname = "libfty_proto" header="ftyproto.h" prefix="fty_proto"
+    <use project = "fty-proto" libname = "libfty_proto" header = "ftyproto.h" prefix = "fty_proto"
     min_major = "1" min_minor = "0" min_patch = "0"
     repository = "https://github.com/42ity/fty-proto.git"
     release = "master"
     test = "fty_proto_test" >
 
         <use project = "czmq"
-        repository="https://github.com/42ity/czmq.git"
+        repository = "https://github.com/42ity/czmq.git"
         release = "v3.0.2-FTY-master"
         min_major = "3" min_minor = "0" min_patch = "2" >
 
             <use project = "libzmq"
-            repository="https://github.com/42ity/libzmq.git"
+            repository = "https://github.com/42ity/libzmq.git"
             release = "4.2.0-FTY-master" >
 
                 <use project = "libsodium" prefix = "sodium"
@@ -85,11 +85,11 @@
         </use>
 
         <use project = "malamute" min_major = "1" test = "mlm_server_test"
-        repository="https://github.com/42ity/malamute.git"
+        repository = "https://github.com/42ity/malamute.git"
         release = "1.0-FTY-master"
         />
 
-        <use project = "fty-common-logging" libname = "libfty_common_logging" header="fty_log.h"
+        <use project = "fty-common-logging" libname = "libfty_common_logging" header = "fty_log.h"
         repository = "https://github.com/42ity/fty-common-logging.git"
         release = "master"
         test = "fty_common_logging_selftest" >
@@ -101,16 +101,16 @@
         </use>
     </use>
 
-    <use project = "cxxtools" test="cxxtools::Utf8Codec::Utf8Codec" header="cxxtools/allocator.h"
+    <use project = "cxxtools" test = "cxxtools::Utf8Codec::Utf8Codec" header = "cxxtools/allocator.h"
         repository = "https://github.com/42ity/cxxtools.git"
         release = "2.2-FTY-master"
         />
 
-    <class name = "topologyresolver" private="1">Class for asset location recursive resolving</class>
-    <class name = "ftyinfo" private="1" selftest="0">Class for keeping fty information</class>
-    <class name = "linuxmetric" selftest="0">Class for finding out Linux system info</class>
+    <class name = "topologyresolver" private = "1">Class for asset location recursive resolving</class>
+    <class name = "ftyinfo" private = "1" selftest = "0">Class for keeping fty information</class>
+    <class name = "linuxmetric" selftest = "0">Class for finding out Linux system info</class>
     <class name = "fty-info-server">42ity info server</class>
-    <class name = "fty-info-rc0-runonce" private="1">Run once actor to update rackcontroller-0 (SN, ...)</class>
+    <class name = "fty-info-rc0-runonce" private = "1">Run once actor to update rackcontroller-0 (SN, ...)</class>
 
     <main  name = "fty-info" service = "1">Agent which returns rack controller information</main>
 
