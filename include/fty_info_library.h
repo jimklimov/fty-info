@@ -35,6 +35,7 @@
 #include <fty_log.h>
 #include <ftyproto.h>
 #include <cxxtools/allocator.h>
+#include <fty_shm.h>
 
 //  FTY_INFO version macros for compile-time API detection
 #define FTY_INFO_VERSION_MAJOR 1
