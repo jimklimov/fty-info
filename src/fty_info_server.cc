@@ -253,6 +253,8 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
                 value,
                 metric->unit
                 );
+
+        fty::shm::write_metric(rc_iname, metric->type, value, metric->unit, ttl);
         char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
         if (mlm_client_send (self->info_client, subject, &msg) != -1) {
             log_trace ("Metric %s published on METRICS stream", metric->type);
