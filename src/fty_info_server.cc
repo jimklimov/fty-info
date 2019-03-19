@@ -244,27 +244,15 @@ s_publish_linuxmetrics (fty_info_server_t  * self)
     while (metric) {
         char *value = zsys_sprintf ("%lf", metric->value);
         log_debug ("Publishing metric %s, value %lf, unit %s", metric->type , metric->value, metric->unit);
-        zmsg_t *msg = fty_proto_encode_metric (
-                NULL,
-                ::time (NULL),
-                ttl,
-                metric->type,
-                rc_iname,
-                value,
-                metric->unit
-                );
 
-        fty::shm::write_metric(rc_iname, metric->type, value, metric->unit, ttl);
-        char *subject = zsys_sprintf ("%s@%s", metric->type, rc_iname);
-        if (mlm_client_send (self->info_client, subject, &msg) != -1) {
-            log_trace ("Metric %s published on METRICS stream", metric->type);
+        if(fty::shm::write_metric(rc_iname, metric->type, value, metric->unit, ttl) == 0) {
+            log_trace ("Metric %s published", metric->type);
         }
         else {
-            log_error ("Can't publish metric %s on METRICS stream", metric->type);
+            log_error ("Can't publish metric %s", metric->type);
         }
         linuxmetric_destroy (&metric);
         metric = (linuxmetric_t *) zlistx_next (info);
-        zstr_free (&subject);
         zstr_free (&value);
     }
 
@@ -354,7 +342,7 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 //do the first announce
                 s_publish_announce(self);
         }
-        else if (streq (stream, "METRICS-TEST") || streq (stream, FTY_PROTO_STREAM_METRICS)) {
+        else if (streq (stream, "METRICS-TEST")) {
             self->test = streq(stream,"METRICS-TEST");
             int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
             if (rv == -1)
@@ -672,6 +660,16 @@ void
 fty_info_server_test (bool verbose)
 {
     printf (" * fty_info_server_test: ");
+
+    // Note: If your selftest reads SCMed fixture data, please keep it in
+    // src/selftest-ro; if your test creates filesystem objects, please
+    // do so under src/selftest-rw. They are defined below along with a
+    // usecase for the variables (assert) to make compilers happy.
+    const char *SELFTEST_DIR_RO = "src/selftest-ro";
+    const char *SELFTEST_DIR_RW = "src/selftest-rw";
+    assert (SELFTEST_DIR_RO);
+    assert (SELFTEST_DIR_RW);
+    assert (fty_shm_set_test_dir(SELFTEST_DIR_RW) == 0);
 
     //  @selftest
 
@@ -1115,14 +1113,6 @@ fty_info_server_test (bool verbose)
     {
         log_debug ("fty-info-test:Test #7");
 
-        // Note: If your selftest reads SCMed fixture data, please keep it in
-        // src/selftest-ro; if your test creates filesystem objects, please
-        // do so under src/selftest-rw. They are defined below along with a
-        // usecase for the variables (assert) to make compilers happy.
-        const char *SELFTEST_DIR_RO = "src/selftest-ro";
-        const char *SELFTEST_DIR_RW = "src/selftest-rw";
-        assert (SELFTEST_DIR_RO);
-        assert (SELFTEST_DIR_RW);
         // Uncomment these to use C++ strings in C++ selftest code:
         std::string str_SELFTEST_DIR_RO = std::string(SELFTEST_DIR_RO);
         std::string str_SELFTEST_DIR_RW = std::string(SELFTEST_DIR_RW);
@@ -1134,23 +1124,22 @@ fty_info_server_test (bool verbose)
         zstr_sendx (info_server, "ROOT_DIR", root_dir.c_str (), NULL);
         zstr_sendx (info_server, "LINUXMETRICSINTERVAL", "30", NULL);
         zstr_sendx (info_server, "PRODUCER", "METRICS-TEST", NULL);
+        
         zclock_sleep (1000);
 
         zhashx_t *metrics = zhashx_new ();
         zhashx_set_destructor (metrics, (void (*)(void**)) fty_proto_destroy);
         // we have 12 non-network metrics
-        for (int i = 0; i < 12; i++)
         {
-            zmsg_t *recv = mlm_client_recv (metric_reader);
-            assert(recv);
-            const char *command = mlm_client_command (metric_reader);
-            assert(streq (command, "STREAM DELIVER"));
-
-            assert (fty_proto_is (recv));
-            fty_proto_t *metric = fty_proto_decode (&recv);
+          zclock_sleep (1000);
+          fty::shm::shmMetrics results;
+          fty::shm::read_metrics(".*", "(?!(tx|rx)).*", results);
+          assert(results.size() == 12);
+          for (auto &metric : results) {
             assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
             const char* type = fty_proto_type (metric);
-            zhashx_update (metrics, type, metric);
+            zhashx_update (metrics, type, fty_proto_dup(metric));
+          }
         }
 
         zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
@@ -1162,17 +1151,17 @@ fty_info_server_test (bool verbose)
             if (streq (state, "up")) {
                 // we have 3 network metrics: bandwidth, bytes, error_ratio
                 // for both rx and tx
-                for (int i = 0; i < 2*3; i++) {
-                    zmsg_t *recv = mlm_client_recv (metric_reader);
-                    assert(recv);
-                    const char *command = mlm_client_command (metric_reader);
-                    assert(streq (command, "STREAM DELIVER"));
-
-                    assert (fty_proto_is (recv));
-                    fty_proto_t *metric = fty_proto_decode (&recv);
+                {
+                  fty::shm::shmMetrics results;
+                  std::string regex = "(rx|tx).*\\.";
+                  regex.append(iface);
+                  fty::shm::read_metrics(".*", regex, results);
+                  assert(results.size() == 2*3);
+                  for (auto &metric : results) {
                     assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
                     const char* type = fty_proto_type (metric);
-                    zhashx_update (metrics, type, metric);
+                    zhashx_update (metrics, type, fty_proto_dup(metric));
+                  }
                 }
             }
             state = (const char *) zhashx_next (interfaces);
@@ -1392,5 +1381,6 @@ fty_info_server_test (bool verbose)
     mlm_client_destroy (&client);
     zactor_destroy (&info_server);
     zactor_destroy (&server);
+    fty_shm_delete_test_dir();
     log_info ("OK\n");
 }
