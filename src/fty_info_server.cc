@@ -1130,18 +1130,7 @@ fty_info_server_test (bool verbose)
         zhashx_t *metrics = zhashx_new ();
         zhashx_set_destructor (metrics, (void (*)(void**)) fty_proto_destroy);
         // we have 12 non-network metrics
-        {
-          zclock_sleep (1000);
-          fty::shm::shmMetrics results;
-          fty::shm::read_metrics(".*", "(?!(tx|rx)).*", results);
-          assert(results.size() == 12);
-          for (auto &metric : results) {
-            assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
-            const char* type = fty_proto_type (metric);
-            zhashx_update (metrics, type, fty_proto_dup(metric));
-          }
-        }
-
+        size_t number_metrics = 12;
         zhashx_t *interfaces = linuxmetric_list_interfaces (root_dir);
         const char *state = (const char *) zhashx_first (interfaces);
         while (state != NULL)  {
@@ -1149,22 +1138,22 @@ fty_info_server_test (bool verbose)
             log_debug ("interface %s = %s", iface, state);
 
             if (streq (state, "up")) {
-                // we have 3 network metrics: bandwidth, bytes, error_ratio
-                // for both rx and tx
-                {
-                  fty::shm::shmMetrics results;
-                  std::string regex = "(rx|tx).*\\.";
-                  regex.append(iface);
-                  fty::shm::read_metrics(".*", regex, results);
-                  assert(results.size() == 2*3);
-                  for (auto &metric : results) {
-                    assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
-                    const char* type = fty_proto_type (metric);
-                    zhashx_update (metrics, type, fty_proto_dup(metric));
-                  }
-                }
+              // we have 3 network metrics: bandwidth, bytes, error_ratio
+              // for both rx and tx
+              number_metrics+=(2*3);
             }
             state = (const char *) zhashx_next (interfaces);
+        }
+        {
+          zclock_sleep (1000);
+          fty::shm::shmMetrics results;
+          fty::shm::read_metrics(".*", ".*", results);
+          assert(results.size() == number_metrics);
+          for (auto &metric : results) {
+            assert (fty_proto_id (metric) == FTY_PROTO_METRIC);
+            const char* type = fty_proto_type (metric);
+            zhashx_update (metrics, type, fty_proto_dup(metric));
+          }
         }
 
         assert (zhashx_lookup (metrics, LINUXMETRIC_UPTIME));
