@@ -46,7 +46,6 @@ struct _fty_info_server_t {
     char* path;
     mlm_client_t *client;
     mlm_client_t *announce_client;
-    mlm_client_t *info_client;
     bool first_announce;
     bool test;
     topologyresolver_t* resolver;
@@ -87,7 +86,6 @@ info_server_new (char *name)
     self->name=strdup(name);
     self->client = mlm_client_new ();
     self->announce_client = mlm_client_new ();
-    self->info_client = mlm_client_new ();
     self->first_announce=true;
     self->test = false;
     self->history = zhashx_new();
@@ -110,7 +108,6 @@ info_server_destroy (fty_info_server_t  **self_p)
         //  Free class properties here
         mlm_client_destroy (&self->client);
         mlm_client_destroy (&self->announce_client);
-        mlm_client_destroy (&self->info_client);
         zstr_free(&self->name);
         zstr_free(&self->endpoint);
         zstr_free(&self->path);
@@ -228,8 +225,7 @@ s_publish_announce(fty_info_server_t  * self)
 static void
 s_publish_linuxmetrics (fty_info_server_t  * self)
 {
-    if(!mlm_client_connected(self->info_client))
-        return;
+    log_debug ("s_publish_linuxmetrics");
 
     zlistx_t *info = linuxmetric_get_all
         (self->linuxmetrics_interval,
@@ -343,17 +339,9 @@ s_handle_pipe(fty_info_server_t* self,zmsg_t *message)
                 s_publish_announce(self);
         }
         else if (streq (stream, "METRICS-TEST")) {
-            self->test = streq(stream,"METRICS-TEST");
-            int rv = mlm_client_connect (self->info_client, self->endpoint, 1000, "fty_info_linuxmetrics");
-            if (rv == -1)
-                    log_error("fty_info_linuxmetrics : mlm_client_connect failed\n");
-            rv = mlm_client_set_producer (self->info_client, stream);
-            if (rv == -1)
-                log_error ("%s: can't set producer on stream '%s'",
-                        self->name, stream);
-            else
-                //publish the first metrics
-                s_publish_linuxmetrics (self);
+            // publish the first metrics
+            // we need to keep this approach for testing purpose
+            s_publish_linuxmetrics (self);
         }
         else {
             int rv = mlm_client_set_producer (self->client, stream);
@@ -1106,14 +1094,10 @@ fty_info_server_test (bool verbose)
         zmsg_destroy (&recv);
         log_info ("fty-info-test:Test #6: OK");
     }
-    mlm_client_t *metric_reader = mlm_client_new ();
-    mlm_client_connect (metric_reader, endpoint, 1000, "fty_info_metric_reader");
-    mlm_client_set_consumer (metric_reader, "METRICS-TEST", ".*");
     // TEST #7 : test metrics - just types
     {
         log_debug ("fty-info-test:Test #7");
 
-        // Uncomment these to use C++ strings in C++ selftest code:
         std::string str_SELFTEST_DIR_RO = std::string(SELFTEST_DIR_RO);
         std::string str_SELFTEST_DIR_RW = std::string(SELFTEST_DIR_RW);
         assert ( (str_SELFTEST_DIR_RO != "") );
@@ -1362,8 +1346,6 @@ fty_info_server_test (bool verbose)
         log_info ("OK\n");
     }
 
-
-    mlm_client_destroy (&metric_reader);
     mlm_client_destroy (&asset_generator);
     //  @end
 
