@@ -146,7 +146,6 @@ int main (int argc, char *argv [])
     zstr_sendx (server, "PRODUCER", "ANNOUNCE", NULL);
     zstr_sendx (server, "ROOT_DIR", "/", NULL);
     zstr_sendx (server, "LINUXMETRICSINTERVAL", str_linuxmetrics_interval, NULL);
-    zstr_sendx (server, "PRODUCER", FTY_PROTO_STREAM_METRICS, NULL);
 
     // Run once actor to fill data about rackcontroller-0
     zactor_t *rc0_runonce = zactor_new (fty_info_rc0_runonce, (void *) RC0_RUNONCE_ACTOR);
