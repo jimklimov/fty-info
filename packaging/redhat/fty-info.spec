@@ -53,13 +53,13 @@ BuildRequires:  xmlto
 BuildRequires:  gcc-c++
 BuildRequires:  libsodium-devel
 BuildRequires:  zeromq-devel
-BuildRequires:  czmq-devel
-BuildRequires:  malamute-devel
+BuildRequires:  czmq-devel >= 3.0.2
+BuildRequires:  malamute-devel >= 1.0.0
 BuildRequires:  log4cplus-devel
 BuildRequires:  fty-common-logging-devel
-BuildRequires:  fty-proto-devel
+BuildRequires:  fty-proto-devel >= 1.0.0
 BuildRequires:  cxxtools-devel
-BuildRequires:  fty_shm-devel
+BuildRequires:  fty_shm-devel >= 1.0.0
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -85,13 +85,13 @@ Group:          System/Libraries
 Requires:       libfty_info1 = %{version}
 Requires:       libsodium-devel
 Requires:       zeromq-devel
-Requires:       czmq-devel
-Requires:       malamute-devel
+Requires:       czmq-devel >= 3.0.2
+Requires:       malamute-devel >= 1.0.0
 Requires:       log4cplus-devel
 Requires:       fty-common-logging-devel
-Requires:       fty-proto-devel
+Requires:       fty-proto-devel >= 1.0.0
 Requires:       cxxtools-devel
-Requires:       fty_shm-devel
+Requires:       fty_shm-devel >= 1.0.0
 
 %description devel
 agent which returns rack controller information development tools

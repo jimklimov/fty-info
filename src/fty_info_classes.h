@@ -32,8 +32,6 @@
 //  External API
 #include "../include/fty_info.h"
 
-//  Extra headers
-
 //  Opaque class structures to allow forward references
 #ifndef TOPOLOGYRESOLVER_T_DEFINED
 typedef struct _topologyresolver_t topologyresolver_t;
@@ -47,6 +45,8 @@ typedef struct _ftyinfo_t ftyinfo_t;
 typedef struct _fty_info_rc0_runonce_t fty_info_rc0_runonce_t;
 #define FTY_INFO_RC0_RUNONCE_T_DEFINED
 #endif
+
+//  Extra headers
 
 //  Internal API
 
