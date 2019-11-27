@@ -40,15 +40,15 @@ typedef struct {
 static test_item_t
 all_tests [] = {
 #ifdef FTY_INFO_BUILD_DRAFT_API
-// Tests for draft public classes:
-    { "fty_info_server", fty_info_server_test, false, true, NULL },
-#endif // FTY_INFO_BUILD_DRAFT_API
-#ifdef FTY_INFO_BUILD_DRAFT_API
 // Tests for stable/draft private classes:
 // Now built only with --enable-drafts, so even stable builds are hidden behind the flag
     { "topologyresolver", NULL, true, false, "topologyresolver_test" },
     { "fty_info_rc0_runonce", NULL, true, false, "fty_info_rc0_runonce_test" },
     { "private_classes", NULL, false, false, "$ALL" }, // compat option for older projects
+#endif // FTY_INFO_BUILD_DRAFT_API
+#ifdef FTY_INFO_BUILD_DRAFT_API
+// Tests for draft public classes:
+    { "fty_info_server", fty_info_server_test, false, true, NULL },
 #endif // FTY_INFO_BUILD_DRAFT_API
     {NULL, NULL, 0, 0, NULL}          //  Sentinel
 };
