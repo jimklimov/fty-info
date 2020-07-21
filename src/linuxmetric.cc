@@ -55,7 +55,7 @@ s_get_field (std::string line, int index)
             }
             return std::stod (field);
         }
-        catch (std::istringstream::failure e) {
+        catch (std::istringstream::failure& e) {
             log_error ("Error while parsing string %s", line.c_str ());
             return std::numeric_limits<double>::quiet_NaN ();
         }
@@ -92,7 +92,7 @@ s_getline_by_number (std::string filename, int index)
         std::getline (file, line);
         return line;
     }
-    catch (std::ifstream::failure e) {
+    catch (std::ifstream::failure& e) {
         log_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
@@ -116,7 +116,7 @@ s_getline_by_name (std::string filename, const char *name)
         } while (!file.eof () && strncmp (line.c_str (), name, strlen (name)) != 0);
         return line;
     }
-    catch (std::ifstream::failure e) {
+    catch (std::ifstream::failure& e) {
         log_error ("Error while reading file %s", filename.c_str ());
         return "";
     }
