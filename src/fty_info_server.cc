@@ -134,11 +134,18 @@ char *s_get_name(ftyinfo_t *info)
     char *buffer = (char *)malloc(s_name.length() + 12);
     char first_digit[9];
     const char *uuid = ftyinfo_uuid(info);
+#if __GNUC__ >= 8
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
     if (uuid) {
         strncpy(first_digit, uuid, 8);
     } else {
         strncpy(first_digit, DEFAULT_UUID, 8);
     }
+#if __GNUC__ >= 8
+#pragma GCC diagnostic pop
+#endif
     first_digit[8] = '\0';
     sprintf(buffer, "%s (%s)", s_name.c_str(), first_digit);
     return buffer;
