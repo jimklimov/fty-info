@@ -31,6 +31,16 @@
    ...
 }
 {
+   <cxxtools_initlocale>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN8cxxtools10InitLocaleC1Ev
+   fun:__static_initialization_and_destruction_0
+   fun:_GLOBAL__sub_I_fty_info_server.cc
+   ...
+}
+{
    <tntdb_connect>
    Memcheck:Leak
    match-leak-kinds: definite

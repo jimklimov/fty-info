@@ -85,6 +85,7 @@ s_get_installation_date (
 }
 
 static const char* RELEASE_DETAILS = "/etc/release-details.json";
+static const char* BRANDING_INFO = "/etc/etn-ipm2-branding.conf";
 
 static cxxtools::SerializationInfo*
 s_load_release_details()
@@ -96,7 +97,7 @@ s_load_release_details()
         std::stringstream s(json_string);
         cxxtools::JsonDeserializer json(s);
         json.deserialize (*si);
-        log_info("fty-info:load %s OK",RELEASE_DETAILS);
+        log_info("fty-info:load %s OK", RELEASE_DETAILS);
     }
     catch (const std::exception& e) {
         log_error ("Error while parsing JSON: %s", e.what ());
@@ -113,6 +114,48 @@ s_get_release_details
     std::string value;
     try {
         si->getMember("release-details").getMember(key) >>= value;
+    }
+    catch (const std::exception& e) {
+        log_info ("Problem with getting %s in JSON: %s", key, e.what ());
+        if (dfl) {
+            return strdup(dfl);
+        } else {
+            return NULL;
+        }
+    }
+    if (value.empty () && dfl) {
+	    return strdup (dfl);
+    }
+    return strdup(value.c_str());
+}
+
+static cxxtools::SerializationInfo*
+s_load_branding_info()
+{
+    cxxtools::SerializationInfo *si = new cxxtools::SerializationInfo();
+    try {
+        std::ifstream f(BRANDING_INFO);
+        std::string json_string (std::istreambuf_iterator<char>(f), {});
+        std::stringstream s(json_string);
+        cxxtools::JsonDeserializer json(s);
+        json.deserialize (*si);
+        log_info("fty-info:load %s OK", BRANDING_INFO);
+    }
+    catch (const std::exception& e) {
+        log_error ("Error while parsing JSON: %s", e.what ());
+    }
+    return si;
+}
+
+static char*
+s_get_branding_info
+    (cxxtools::SerializationInfo *si,
+     const char *key,
+     const char * dfl)
+{
+    std::string value;
+    try {
+        si->getMember(key) >>= value;
     }
     catch (const std::exception& e) {
         log_info ("Problem with getting %s in JSON: %s", key, e.what ());
@@ -174,8 +217,8 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     cxxtools::SerializationInfo *si = nullptr;
     si = s_load_release_details();
     self->uuid   = s_get_release_details (si, "uuid", NULL);
-    self->vendor = s_get_release_details (si, "hardware-vendor", NULL);
-    self->manufacturer = self->vendor;
+    self->vendor = s_get_release_details (si, "hardware-vendor", NULL); // Eaton or OEMs
+    self->manufacturer = strdup("EATON");                               // Eaton only
     self->serial = s_get_release_details (si, "hardware-serial-number", "N/A");
     self->product  = s_get_release_details (si, "hardware-catalog-number", NULL);
     self->part_number  = s_get_release_details (si, "hardware-part-number", NULL);
@@ -187,6 +230,12 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     log_info ("fty-info:product        = '%s'", self->product);
     log_info ("fty-info:part_number  = '%s'", self->part_number);
     log_info ("fty-info:version      = '%s'", self->version);
+
+    // get complementary branding info
+    cxxtools::SerializationInfo *bi = nullptr;
+    bi = s_load_branding_info();
+    self->licensing_portal = s_get_branding_info (bi, "licensing_portal", "N/A");
+    log_info ("fty-info:licensing_portal = '%s'", self->licensing_portal);
 
     // set description, contact
     self->description = topologyresolver_to_description (resolver);
@@ -254,6 +303,9 @@ ftyinfo_new (topologyresolver_t *resolver, const char *path)
     if(si)
         delete si;
 
+    if(bi)
+        delete bi;
+
     return self;
 }
 
@@ -273,6 +325,7 @@ ftyinfo_test_new (void)
     self->name_uri  = strdup (TST_NAME_URI);
     self->product     = strdup (TST_PRODUCT);
     self->vendor    = strdup (TST_VENDOR);
+    self->licensing_portal    = strdup (TST_LIC_URL);
     self->serial    = strdup (TST_SERIAL);
     self->part_number    = strdup (TST_PART_NUMBER);
     self->location  = strdup (TST_LOCATION);
@@ -308,6 +361,8 @@ ftyinfo_destroy (ftyinfo_t **self_ptr)
         if (&self->name_uri) zstr_free (&self->name_uri);
         if (&self->product) zstr_free (&self->product);
         if (&self->vendor) zstr_free (&self->vendor);
+        if (&self->manufacturer) zstr_free (&self->manufacturer);
+        if (&self->licensing_portal) zstr_free (&self->licensing_portal);
         if (&self->serial) zstr_free (&self->serial);
         if (&self->part_number) zstr_free (&self->part_number);
         if (&self->location) zstr_free (&self->location);
@@ -349,6 +404,7 @@ zhash_t *ftyinfo_infohash (ftyinfo_t *self)
     if (self->name) zhash_insert(self->infos, INFO_NAME, self->name);
     if (self->name_uri) zhash_insert(self->infos, INFO_NAME_URI, self->name_uri);
     if (self->vendor) zhash_insert(self->infos, INFO_VENDOR, self->vendor);
+    if (self->licensing_portal) zhash_insert(self->infos, INFO_LICENSING_PORTAL, self->licensing_portal);
     if (self->manufacturer) zhash_insert(self->infos, INFO_MANUFACTURER, self->manufacturer);
     if (self->product) zhash_insert(self->infos, INFO_PRODUCT, self->product);
     if (self->serial) zhash_insert(self->infos, INFO_SERIAL, self->serial);
