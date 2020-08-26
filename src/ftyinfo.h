@@ -48,6 +48,7 @@ extern "C" {
 #define TST_NAME_URI    "/asset/rackcontroller-0"
 #define TST_PRODUCT     "IPC3000"
 #define TST_VENDOR      "Eaton"
+#define TST_LIC_URL     "www.eaton.com/licensing-portal"
 #define TST_SERIAL      "LA71026006"
 #define TST_PART_NUMBER      "123456"
 #define TST_LOCATION         "Rack1"
@@ -79,6 +80,7 @@ struct _ftyinfo_t {
     char *name_uri;
     char *product;
     char *vendor;
+    char *licensing_portal;
     char *manufacturer;
     char *serial;
     char *part_number;

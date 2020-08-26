@@ -51,6 +51,7 @@ using namespace std;
 #define INFO_NAME               "name"
 #define INFO_NAME_URI           "name-uri"
 #define INFO_VENDOR             "vendor"
+#define INFO_LICENSING_PORTAL   "licensing_portal"
 #define INFO_MANUFACTURER       "manufacturer"
 #define INFO_PRODUCT            "product"
 #define INFO_SERIAL             "serialNumber"
